@@ -94,8 +94,15 @@ function snapshotWorktree({ message, env } = {}) {
       }
     }
 
-    // Also capture staged changes
+    // Also capture staged changes (tracked files modified in worktree)
     git(['add', '-u'], { env: tmpEnv, cwd: root });
+
+    // Capture staged-but-not-HEAD new files (added via `git add newfile` but not yet committed)
+    const stagedNew = gitSafe(['diff', '--cached', '--name-only', '--diff-filter=A'], { cwd: root });
+    const stagedNewFiles = stagedNew ? stagedNew.split('\n').filter(Boolean) : [];
+    if (stagedNewFiles.length) {
+      git(['add', '--', ...stagedNewFiles], { env: tmpEnv, cwd: root });
+    }
 
     const worktreeTree = git(['write-tree'], { env: tmpEnv });
 
