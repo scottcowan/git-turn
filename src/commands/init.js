@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const { gitDir, git } = require('../git');
 const { newSession, ensureDirs } = require('../session');
 
@@ -43,6 +44,25 @@ function run(args) {
   const session = newSession();
   console.log(`✓ Started session: ${session.session_id}`);
   console.log(`✓ Captured ${session.preexisting_untracked.length} pre-existing untracked files`);
+
+  // Write format discovery blob (D-11)
+  const schema = JSON.stringify({
+    version: '1',
+    tool: 'git-turn',
+    schema: 'turns/v1',
+    ref_pattern: 'refs/git-turn/sessions/{id}/turn-{N}',
+    notes_ref: 'refs/notes/git-turn',
+  });
+  const result = spawnSync('git', ['hash-object', '-w', '--stdin'], {
+    input: schema,
+    encoding: 'utf8',
+    cwd: process.cwd(),
+  });
+  if (result.status === 0) {
+    const blobSha = result.stdout.trim();
+    git(['update-ref', 'refs/git-turn/format', blobSha]);
+    console.log('✓ Wrote format discovery blob: refs/git-turn/format');
+  }
 
   console.log('\ngit turn is ready. Run `git turn log` after your next agent session.');
 }
