@@ -6,7 +6,7 @@
     "git-turn": "./bin/git-turn"
   },
   "scripts": {
-    "test": "node --test src/**/*.test.js"
+    "test": "node --test"
   },
   "keywords": ["git", "ai", "agent", "audit", "claude", "cursor", "aider"],
   "license": "MIT",
