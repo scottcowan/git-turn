@@ -27,8 +27,25 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 - **Read-only turns skipped** — no commit = no snapshot (Option 1)
 - **Separate from warren** — works in any git repo; warren is optional for `git turn branch`
 
+## Current State
+
+**Shipped:** v0.1 — Working CLI (2026-08-09)
+
+8 commands working end-to-end: `init`, `log`, `show`, `diff`, `revert`, `redo`, `status`, `gc`. Full test suite (23 tests). Hook installs via absolute path for cross-repo compatibility.
+
+**Known issues at v0.1:**
+- `git turn log` output label says "turn N session …" (snapshot commit message verbatim) — needs cleaner formatting in v0.2
+- No SQLite read cache yet — log/blame will be slow on large histories
+
+**Next milestone goals (v0.2):**
+- SQLite read cache for fast `log`, `blame`, `bisect`
+- `git turn bisect <cmd>` and `git turn blame <file>`
+
 ## Prior art
 
 - pi-rewind (arpagon) — dangling commit-tree, two-tree snapshot, pending-promise pattern
 - copilot-timeline-session (mmcs-work) — untracked exclusion, hash-keyed sidecar
 - Jujutsu — content-addressed op log, op restore via update-ref only
+
+---
+*Last updated: 2026-08-09 after v0.1 milestone*
