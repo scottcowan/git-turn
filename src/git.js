@@ -13,6 +13,7 @@ function git(args, opts = {}) {
     encoding: 'utf8',
     cwd: opts.cwd || process.cwd(),
     env: opts.env ? { ...process.env, ...opts.env } : process.env,
+    ...(opts.stdio ? { stdio: opts.stdio } : {}),
   }).trim();
 }
 

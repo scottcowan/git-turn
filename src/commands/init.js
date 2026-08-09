@@ -6,11 +6,16 @@ const { spawnSync } = require('child_process');
 const { gitDir, git } = require('../git');
 const { newSession, ensureDirs } = require('../session');
 
-const HOOK_SCRIPT = `#!/usr/bin/env node
+// Absolute path to post-commit.js, resolved at install time so the hook
+// works in any repo regardless of whether git-turn is in its node_modules.
+const HOOK_SCRIPT = () => {
+  const hookSrc = path.resolve(__dirname, '../hooks/post-commit.js');
+  return `#!/usr/bin/env node
 // git-turn post-commit hook
 // Installed by: git turn init
-require('git-turn/src/hooks/post-commit').run();
+require(${JSON.stringify(hookSrc)}).run();
 `;
+};
 
 function run(args) {
   const gd = gitDir();
@@ -29,7 +34,7 @@ function run(args) {
       process.exit(1);
     }
   } else {
-    fs.writeFileSync(hookPath, HOOK_SCRIPT, { mode: 0o755 });
+    fs.writeFileSync(hookPath, HOOK_SCRIPT(), { mode: 0o755 });
     console.log(`✓ Installed post-commit hook: ${hookPath}`);
   }
 

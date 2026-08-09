@@ -21,8 +21,8 @@ function run(args) {
   console.log(`Session: ${session.session_id}\n`);
 
   for (const { turn_n, sha } of turns) {
-    // Get note for this snapshot
-    const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', sha]);
+    // Get note for this snapshot — suppress stderr so "no note found" doesn't leak
+    const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', sha], { stdio: ['pipe', 'pipe', 'ignore'] });
     let meta = {};
     try { meta = note ? JSON.parse(note) : {}; } catch {}
 
