@@ -26,7 +26,10 @@ function run(args) {
   // Pre-revert snapshot MUST happen before any restore so redo has a concrete SHA
   const { commitSha: pre_revert_snapshot_sha } = snapshotWorktree({ message: 'pre-revert snapshot (turn ' + N + ')' });
 
-  // Write revert op BEFORE restoring — if restore throws, the op log record is already written
+  // Restore worktree to target turn state — throws on branch mismatch (D-03), propagate unhandled
+  restoreSnapshot(turn.sha, { branch: session.branch });
+
+  // Write revert op AFTER successful restore — avoids corrupting undo stack if restore throws
   writeOp('revert', {
     session_id: session.session_id,
     turn_n: N,
@@ -34,9 +37,6 @@ function run(args) {
     pre_revert_snapshot_sha,
     branch: session.branch,
   });
-
-  // Restore worktree to target turn state — throws on branch mismatch (D-03), propagate unhandled
-  restoreSnapshot(turn.sha, { branch: session.branch });
 
   console.log('Reverted to turn ' + N);
 }
