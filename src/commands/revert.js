@@ -26,7 +26,7 @@ function run(args) {
   // Pre-revert snapshot MUST happen before any restore so redo has a concrete SHA
   const { commitSha: pre_revert_snapshot_sha } = snapshotWorktree({ message: 'pre-revert snapshot (turn ' + N + ')' });
 
-  // Write revert op BEFORE restoring — if restore throws, op log entry is already written
+  // Write revert op BEFORE restoring — if restore throws, the op log record is already written
   writeOp('revert', {
     session_id: session.session_id,
     turn_n: N,
