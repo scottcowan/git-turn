@@ -99,12 +99,18 @@ function snapshotWorktree({ message, env } = {}) {
 
     const worktreeTree = git(['write-tree'], { env: tmpEnv });
 
-    // Real index tree
+    // Real index tree (for reference; stored in return value only)
     const indexTree = gitSafe(['write-tree']) || worktreeTree;
+
+    // Parent commit: use HEAD if it exists (headSha returns 40 zeros when no commits yet)
+    const parentSha = headSha();
+    const commitArgs = parentSha !== '0'.repeat(40)
+      ? ['commit-tree', worktreeTree, '-p', parentSha, '-m', message || 'git-turn snapshot']
+      : ['commit-tree', worktreeTree, '-m', message || 'git-turn snapshot'];
 
     // Create dangling commit
     const commitSha = git(
-      ['commit-tree', worktreeTree, '-p', indexTree, '-m', message || 'git-turn snapshot'],
+      commitArgs,
       { env: { GIT_AUTHOR_NAME: 'git-turn', GIT_AUTHOR_EMAIL: '', ...env } }
     );
 
