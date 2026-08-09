@@ -31,8 +31,9 @@ function run(args) {
   restoreSnapshot(lastRevert.pre_revert_snapshot_sha, { branch: lastRevert.branch });
 
   // Mark revert as consumed so double-redo fails correctly (D-02)
+  // Use the revert op's session_id so redemption keys are consistent even after re-init
   writeOp('redo', {
-    session_id: session.session_id,
+    session_id: lastRevert.session_id,
     revert_turn_n: lastRevert.turn_n,
     restored_snapshot_sha: lastRevert.pre_revert_snapshot_sha,
   });
