@@ -69,3 +69,4 @@ Turn refs show in `git log --decorate` and survive branch deletion and merging. 
 - [pi-rewind](https://github.com/arpagon/pi-rewind) — dangling commit-tree snapshots, two-tree model
 - [copilot-timeline-session](https://github.com/mmcs-work/copilot-timeline-session) — per-turn commits, untracked exclusion
 - [Jujutsu](https://github.com/jj-vcs/jj) — content-addressed operation log
+test
