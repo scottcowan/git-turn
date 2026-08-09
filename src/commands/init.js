@@ -22,6 +22,7 @@ function run(args) {
     const existing = fs.readFileSync(hookPath, 'utf8');
     if (existing.includes('git-turn')) {
       console.log('git turn: hook already installed');
+      return;
     } else {
       console.error('git turn: post-commit hook already exists (not from git-turn)');
       console.error(`Edit ${hookPath} to add: require('git-turn/src/hooks/post-commit').run();`);
