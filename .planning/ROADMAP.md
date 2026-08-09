@@ -27,3 +27,19 @@ git-turn ships as a git extension. v0.1 delivers the core audit loop: init, turn
 | 4. Prompt capture | Planned |
 | 5. MCP server | Planned |
 | 6. Warren integration | Planned |
+
+## Phase 1 Detail
+
+**Goal:** Complete the v0.1 CLI surface — all 8 commands working end-to-end with a full test suite.
+
+**Requirements:** D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12
+
+**Plans:** 6 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Foundation: fix test script + test-repo helper + diff command (D-04, D-05, D-12)
+- [ ] 01-02-PLAN.md — Read commands: status + init format blob (D-06, D-07, D-11)
+- [ ] 01-03-PLAN.md — Mutation pair: revert + redo commands (D-01, D-02, D-03)
+- [ ] 01-04-PLAN.md — GC command (D-08, D-09, D-10)
+- [ ] 01-05-PLAN.md — Tests for diff, status, init (D-04, D-05, D-06, D-07, D-11, D-12)
+- [ ] 01-06-PLAN.md — Tests for revert, redo, gc (D-01, D-02, D-03, D-08, D-09, D-10, D-12)
