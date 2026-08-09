@@ -3,7 +3,7 @@
 // All git operations go through these helpers.
 // Never use shell string interpolation — always pass args as an array.
 
-const { execFileSync, execFileSyncWithTmpIndex } = require('child_process');
+const { execFileSync } = require('child_process');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
