@@ -38,7 +38,7 @@ function run(args) {
   console.log('✓ Set notes.expiry=never');
 
   // Set up log decoration
-  git(['config', '--add', 'log.showSignature', 'false']);
+  git(['config', 'log.showSignature', 'false']);
 
   // Create session
   ensureDirs();
