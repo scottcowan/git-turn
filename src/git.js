@@ -102,10 +102,19 @@ function snapshotWorktree({ message, env } = {}) {
     // Real index tree
     const indexTree = gitSafe(['write-tree']) || worktreeTree;
 
-    // Create dangling commit
+    // Create a dangling index commit (no parents) to embed the index tree as a parent
+    // so the snapshot commit can reference both trees. git commit-tree -p requires a
+    // commit SHA, not a tree SHA — create the index commit first.
+    const snapshotEnv = { GIT_AUTHOR_NAME: 'git-turn', GIT_AUTHOR_EMAIL: '', ...env };
+    const indexCommitSha = git(
+      ['commit-tree', indexTree, '-m', 'git-turn index snapshot'],
+      { env: snapshotEnv }
+    );
+
+    // Create dangling snapshot commit with worktree tree; index commit as parent
     const commitSha = git(
-      ['commit-tree', worktreeTree, '-p', indexTree, '-m', message || 'git-turn snapshot'],
-      { env: { GIT_AUTHOR_NAME: 'git-turn', GIT_AUTHOR_EMAIL: '', ...env } }
+      ['commit-tree', worktreeTree, '-p', indexCommitSha, '-m', message || 'git-turn snapshot'],
+      { env: snapshotEnv }
     );
 
     return { commitSha, worktreeTree, indexTree, untrackedFiles };
