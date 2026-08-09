@@ -6,6 +6,9 @@ const { rmSync, writeFileSync } = require('fs');
 const { join } = require('path');
 const { execFileSync } = require('child_process');
 const { makeTestRepo } = require('../helpers/test-repo');
+const { snapshotWorktree, updateRef } = require('../git');
+const { ensureDirs, newSession, readSession, incrementTurn, turnRef } = require('../session');
+const { run } = require('./diff');
 
 describe('diff command', () => {
   let dir;
@@ -18,7 +21,6 @@ describe('diff command', () => {
     process.chdir(dir);
 
     // Initialize git-turn session in the test repo
-    const { ensureDirs, newSession } = require('../session');
     ensureDirs();
     newSession();
   });
@@ -40,8 +42,6 @@ describe('diff command', () => {
     execFileSync('git', ['commit', '-q', '-m', `commit ${label}`], { cwd: dir, env, encoding: 'utf8' });
 
     // Snapshot the worktree manually (mirrors post-commit hook logic)
-    const { snapshotWorktree, updateRef } = require('../git');
-    const { readSession, incrementTurn, turnRef } = require('../session');
     const session = readSession();
     const turnN = session.turn_n + 1;
     const { commitSha } = snapshotWorktree({ message: `turn ${turnN}` });
@@ -52,15 +52,14 @@ describe('diff command', () => {
 
   test('exits 1 when not initialized', () => {
     // Remove session.json to simulate an uninitialized git-turn repo
-    const { join: pathJoin } = require('path');
-    const sessionPath = pathJoin(dir, '.git', 'git-turn', 'session.json');
+    const sessionPath = join(dir, '.git', 'git-turn', 'session.json');
     rmSync(sessionPath, { force: true });
 
     const origExit = process.exit;
     let exitCode = null;
     process.exit = (code) => { exitCode = code; throw new Error('process.exit(' + code + ')'); };
     try {
-      require('./diff').run(['1']);
+      run(['1']);
     } catch (e) {
       if (!e.message.startsWith('process.exit')) throw e;
     } finally {
@@ -76,7 +75,7 @@ describe('diff command', () => {
     const origLog = console.log;
     console.log = (...args) => logs.push(args.join(' '));
     try {
-      require('./diff').run(['1']);
+      run(['1']);
     } finally {
       console.log = origLog;
     }
@@ -94,7 +93,7 @@ describe('diff command', () => {
     const origLog = console.log;
     console.log = (...args) => logs.push(args.join(' '));
     try {
-      require('./diff').run(['1', '2']);
+      run(['1', '2']);
     } finally {
       console.log = origLog;
     }

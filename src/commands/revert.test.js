@@ -7,6 +7,7 @@ const { join } = require('path');
 const { makeTestRepo } = require('../helpers/test-repo');
 const { snapshotWorktree, updateRef } = require('../git');
 const { newSession, incrementTurn, turnRef, readOps, ensureDirs } = require('../session');
+const { run } = require('./revert');
 
 // makeTurn: writes content to work.txt, commits, snapshots, updates turn ref, increments session
 function makeTurn(session, content, git) {
@@ -46,7 +47,6 @@ describe('revert command', () => {
 
     const headBefore = git(['rev-parse', 'HEAD']);
 
-    const { run } = require('./revert');
     run(['1']);
 
     const content = readFileSync(join(process.cwd(), 'work.txt'), 'utf8').trim();
@@ -59,7 +59,6 @@ describe('revert command', () => {
   test('writes pre_revert_snapshot_sha to op log before restoring', () => {
     makeTurn(session, 'v1', git);
 
-    const { run } = require('./revert');
     run(['1']);
 
     const ops = readOps();
@@ -73,7 +72,6 @@ describe('revert command', () => {
     // Create a new branch — session.branch remains 'main' but HEAD is now on 'other'
     git(['checkout', '-b', 'other']);
 
-    const { run } = require('./revert');
     assert.throws(() => {
       run(['1']);
     }, /[Bb]ranch/);

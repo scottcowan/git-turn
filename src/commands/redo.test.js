@@ -7,6 +7,8 @@ const { join } = require('path');
 const { makeTestRepo } = require('../helpers/test-repo');
 const { snapshotWorktree, updateRef } = require('../git');
 const { newSession, incrementTurn, turnRef, ensureDirs } = require('../session');
+const { run: revertRun } = require('./revert');
+const { run: redoRun } = require('./redo');
 
 // makeTurn: writes content to work.txt, commits, snapshots, updates turn ref, increments session
 function makeTurn(session, content, git) {
@@ -44,14 +46,12 @@ describe('redo command', () => {
     makeTurn(session, 'v1', git);
     makeTurn(session, 'v2', git);
 
-    const { run: revertRun } = require('./revert');
     revertRun(['1']);
 
     // After revert, file should be v1
     const afterRevert = readFileSync(join(process.cwd(), 'work.txt'), 'utf8').trim();
     assert.equal(afterRevert, 'v1');
 
-    const { run: redoRun } = require('./redo');
     redoRun([]);
 
     // After redo, file should be back to pre-revert state (v2)
@@ -62,7 +62,6 @@ describe('redo command', () => {
   test('exits 1 with nothing to redo when no revert in op log', () => {
     makeTurn(session, 'v1', git);
 
-    const { run: redoRun } = require('./redo');
     let exitCode = null;
     const origExit = process.exit;
     process.exit = (code) => { exitCode = code; throw new Error('process.exit:' + code); };
@@ -80,10 +79,8 @@ describe('redo command', () => {
     makeTurn(session, 'v1', git);
     makeTurn(session, 'v2', git);
 
-    const { run: revertRun } = require('./revert');
     revertRun(['1']);
 
-    const { run: redoRun } = require('./redo');
     // First redo should succeed
     redoRun([]);
 
