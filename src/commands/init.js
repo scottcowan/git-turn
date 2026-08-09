@@ -63,6 +63,8 @@ function run(args) {
     const blobSha = result.stdout.trim();
     git(['update-ref', 'refs/git-turn/format', blobSha]);
     console.log('✓ Wrote format discovery blob: refs/git-turn/format');
+  } else {
+    console.error('git turn: warning: failed to write format discovery blob:', (result.stderr || '').trim());
   }
 
   console.log('\ngit turn is ready. Run `git turn log` after your next agent session.');
