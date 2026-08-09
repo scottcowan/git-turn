@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+'use strict';
+
+const { execFileSync } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+const COMMANDS = ['init', 'log', 'show', 'diff', 'blame', 'bisect', 'revert', 'redo', 'branch', 'status', 'gc', 'session'];
+
+const [,, cmd, ...args] = process.argv;
+
+if (!cmd || cmd === '--help' || cmd === '-h') {
+  console.log(`git turn <command> [options]
+
+Commands:
+  init                    Install post-commit hook in current repo
+  log                     List all turns in current session
+  show <N>                Full diff for turn N (with prompt if available)
+  diff <N> <M>            Diff between turn N and turn M
+  blame <file>            Which turn last touched each line
+  bisect <cmd>            Binary search for turn that broke a command
+  revert <N>              Restore worktree to turn N state
+  redo                    Undo the last revert
+  branch --from <N>       New worktree from turn N snapshot
+  status                  Current session, turn count, hook health
+  gc [--keep-sessions N]  Prune old session refs
+  session new|list        Manage sessions
+`);
+  process.exit(0);
+}
+
+if (!COMMANDS.includes(cmd)) {
+  console.error(`git turn: unknown command '${cmd}'\nRun 'git turn --help' for usage.`);
+  process.exit(1);
+}
+
+// Resolve command module
+const cmdPath = path.join(__dirname, '..', 'src', 'commands', `${cmd}.js`);
+if (!fs.existsSync(cmdPath)) {
+  console.error(`git turn: command '${cmd}' not yet implemented`);
+  process.exit(1);
+}
+
+require(cmdPath).run(args);

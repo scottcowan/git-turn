@@ -1,0 +1,16 @@
+{
+  "name": "git-turn",
+  "version": "0.1.0",
+  "description": "git extension for auditing AI agent sessions",
+  "bin": {
+    "git-turn": "./bin/git-turn"
+  },
+  "scripts": {
+    "test": "node --test src/**/*.test.js"
+  },
+  "keywords": ["git", "ai", "agent", "audit", "claude", "cursor", "aider"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
