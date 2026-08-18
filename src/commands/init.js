@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { gitDir, git } = require('../git');
+const { gitDir, gitSafe, git } = require('../git');
 const { newSession, ensureDirs } = require('../session');
 
 // Absolute path to post-commit.js, resolved at install time so the hook
@@ -17,23 +17,31 @@ require(${JSON.stringify(hookSrc)}).run();
 `;
 };
 
-function run(args) {
+function hooksDir() {
   const gd = gitDir();
-  const hooksDir = path.join(gd, 'hooks');
-  const hookPath = path.join(hooksDir, 'post-commit');
+  // In a git worktree, gitDir() returns .bare/worktrees/<name> which has no hooks/.
+  // The shared hooks live in the common dir (the bare repo root).
+  // git rev-parse --git-common-dir always returns the canonical hooks location.
+  const common = gitSafe(['rev-parse', '--git-common-dir']) || gd;
+  return path.join(common, 'hooks');
+}
 
-  // Check not already installed
+function run(args) {
+  const hDir = hooksDir();
+  const hookPath = path.join(hDir, 'post-commit');
+
+  // Install hook
   if (fs.existsSync(hookPath)) {
     const existing = fs.readFileSync(hookPath, 'utf8');
     if (existing.includes('git-turn')) {
       console.log('git turn: hook already installed');
-      return;
     } else {
       console.error('git turn: post-commit hook already exists (not from git-turn)');
       console.error(`Edit ${hookPath} to add: require('git-turn/src/hooks/post-commit').run();`);
       process.exit(1);
     }
   } else {
+    fs.mkdirSync(hDir, { recursive: true });
     fs.writeFileSync(hookPath, HOOK_SCRIPT(), { mode: 0o755 });
     console.log(`✓ Installed post-commit hook: ${hookPath}`);
   }
