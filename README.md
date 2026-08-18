@@ -24,6 +24,8 @@ git turn init
 
 That installs the post-commit hook. Your next agent session starts capturing turns on every commit.
 
+**Bare repos with git worktrees:** `git turn init` works in any worktree — it finds the shared hooks directory automatically via `git rev-parse --git-common-dir`. Run it once from any worktree and the hook fires for all of them.
+
 ## Commands
 
 ```
