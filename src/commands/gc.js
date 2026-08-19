@@ -28,6 +28,18 @@ function listSessionsByAge() {
 }
 
 function run(args) {
+  if (args.includes('--rebuild')) {
+    try {
+      const { rebuild } = require('../cache');
+      rebuild({ verbose: true });
+      console.log('Cache rebuilt.');
+    } catch (e) {
+      console.error('git turn gc: cache rebuild failed:', e.message);
+      process.exit(1);
+    }
+    return;
+  }
+
   const keepIdx = args.indexOf('--keep-sessions');
   let keepN = 10;
   if (keepIdx !== -1) {
@@ -57,6 +69,11 @@ function run(args) {
 
   if (pruned > 0) {
     console.log("Snapshot objects will be reclaimed on next 'git gc'");
+    // Invalidate stale cache entries for pruned sessions
+    try {
+      const { rebuild } = require('../cache');
+      rebuild();
+    } catch {}
   }
 }
 

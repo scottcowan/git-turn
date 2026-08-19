@@ -11,6 +11,6 @@
   "keywords": ["git", "ai", "agent", "audit", "claude", "cursor", "aider"],
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }

@@ -3,8 +3,9 @@
 // Post-commit hook — called after every git commit.
 // Serialized via a pending-promise chain to prevent concurrent writes.
 
-const { headSha, currentBranch, updateRef, addNote, snapshotWorktree } = require('../git');
+const { headSha, currentBranch, updateRef, addNote, snapshotWorktree, gitSafe } = require('../git');
 const { readSession, incrementTurn, turnRef, writeOp, NOTES_REF } = require('../session');
+const { insertTurn } = require('../cache');
 
 let pending = Promise.resolve();
 
@@ -55,6 +56,26 @@ async function createCheckpoint() {
 
   // Advance turn counter
   incrementTurn(session);
+
+  // Insert into SQLite cache (best-effort — never crash the commit)
+  try {
+    const { commitSha: prevSnapshotSha } = (() => {
+      // Previous turn's snapshot sha for diff baseline
+      const prevRef = turnRef(session.session_id, turnN - 1);
+      const prevSha = gitSafe(['rev-parse', prevRef]);
+      return { commitSha: prevSha };
+    })();
+    insertTurn({
+      sessionId: session.session_id,
+      turnN,
+      snapshotSha: commitSha,
+      headSha: head,
+      branch,
+      ts,
+      meta: {},
+      prevSnapshotSha,
+    });
+  } catch {}
 
   // Write after-op to op log
   writeOp('after-turn', {
