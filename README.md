@@ -72,7 +72,7 @@ Everything lives in your git repo. No server, no external service.
 
 ## Requirements
 
-Node.js 18+. Git 2.x.
+Node.js 22+. Git 2.x.
 
 ## License
 
