@@ -218,4 +218,71 @@ describe('bisect command', () => {
     assert.equal(result.result, 'found');
     assert.equal(result.turn.turn_n, 1);
   });
+
+  test('a 125 exit is SKIP, not a failure', () => {
+    makeTurn(session, 'v1', git);
+
+    const { output, result } = captureBisect({ runCommand: () => ({ status: 125 }) });
+
+    assert.match(output, /SKIP \(untestable, exit 125\)/);
+    assert.notEqual(result.result, 'found');
+  });
+
+  test('an all-125 run returns all-skipped', () => {
+    makeTurn(session, 'v1', git);
+    makeTurn(session, 'v2', git);
+
+    const { output, result } = captureBisect({ runCommand: () => ({ status: 125 }) });
+
+    assert.equal(result.result, 'all-skipped');
+    assert.match(output, /All tested candidates were untestable \(exit 125\)/);
+  });
+
+  test('a 137 exit aborts the search immediately', () => {
+    makeTurn(session, 'v1', git);
+    makeTurn(session, 'v2', git);
+
+    const { output, result } = captureBisect({ runCommand: () => ({ status: 137 }) });
+
+    assert.deepEqual(result, { result: 'aborted', code: 137 });
+    assert.match(output, /Bisect aborted: command exited 137/);
+  });
+
+  test('a null status (killed by signal) also aborts, and the worktree is restored', () => {
+    makeTurn(session, 'v1', git);
+    const before = workContent();
+
+    const { result } = captureBisect({ runCommand: () => ({ status: null }) });
+
+    assert.equal(result.result, 'aborted');
+    assert.equal(workContent(), before);
+  });
+
+  test('writes exactly one bisect-end op with a matching result and turn_n on the found path', () => {
+    makeTurn(session, 'v1', git);
+    makeTurn(session, 'v2', git);
+
+    const { result } = captureBisect({ runCommand: () => ({ status: 1 }) });
+
+    const ends = readOps().filter(op => op.type === 'bisect-end');
+    assert.equal(ends.length, 1);
+    assert.equal(ends[0].result, result.result);
+    assert.equal(ends[0].turn_n, result.turn.turn_n);
+  });
+
+  test('SIGINT listener count is higher during the search than before, and restored after bisectCore returns', () => {
+    makeTurn(session, 'v1', git);
+    const before = process.listenerCount('SIGINT');
+
+    let during;
+    captureBisect({
+      runCommand: () => {
+        during = process.listenerCount('SIGINT');
+        return { status: 0 };
+      },
+    });
+
+    assert.ok(during > before, `expected listener count during the search (${during}) > before (${before})`);
+    assert.equal(process.listenerCount('SIGINT'), before);
+  });
 });

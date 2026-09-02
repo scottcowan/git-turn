@@ -18,6 +18,18 @@ function defaultRunCommand(cmd, cwd) {
   return spawnSync(cmd, { shell: true, stdio: 'inherit', cwd });
 }
 
+// Factored so the finally block and both signal handlers cannot drift on the
+// recovery hint string. Never throws — callers decide what to do next.
+function restorePreBisectState(snapshotSha, branch) {
+  try {
+    restoreSnapshot(snapshotSha, { branch });
+    return true;
+  } catch {
+    process.stderr.write(`git turn: WARNING: failed to restore pre-bisect state; recover with: git read-tree --reset -u ${snapshotSha}^{tree}\n`);
+    return false;
+  }
+}
+
 function bisectCore({ cmd, noCache = false, runCommand = defaultRunCommand, log = console.log }) {
   // D-03: gate on a clean worktree BEFORE anything mutating — no snapshot,
   // no op written on this path.
@@ -48,17 +60,30 @@ function bisectCore({ cmd, noCache = false, runCommand = defaultRunCommand, log 
     branch: session.branch,
   });
 
+  // Signal safety extends the restore guarantee beyond the `finally` below —
+  // spawnSync is blocking, so a Ctrl-C during the child's run must not leave
+  // a candidate tree checked out over the user's work. Named handlers so
+  // they can be removed in the finally without leaking listeners across
+  // repeated invocations in one process (the test suite does exactly this).
+  const onSignal = signal => {
+    restorePreBisectState(pre_bisect_snapshot_sha, session.branch);
+    process.stderr.write(`git turn: aborted by ${signal}, restored pre-bisect state\n`);
+    process.exit(130);
+  };
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+
+  let outcome;
   try {
     log(`Bisecting ${candidates.length} turns with: ${cmd}`);
 
     // First-bad-index binary search over the topology-ordered candidates —
-    // the canonical git-bisect narrowing strategy, not a novel one. 125/null/
-    // >=128 classification is completed in Task 3; for now any nonzero status
-    // is treated as bad.
+    // the canonical git-bisect narrowing strategy, not a novel one.
     let lo = 0;
     let hi = candidates.length - 1;
     let firstBad = null;
     let tested = 0;
+    let skipped = 0;
 
     while (lo <= hi) {
       const mid = Math.floor((lo + hi) / 2);
@@ -71,6 +96,17 @@ function bisectCore({ cmd, noCache = false, runCommand = defaultRunCommand, log 
       if (result.status === 0) {
         log('  PASS');
         lo = mid + 1;
+      } else if (result.status === 125) {
+        log('  SKIP (untestable, exit 125)');
+        skipped++;
+        // git-bisect's own "skip" cannot prove either side of the search;
+        // advancing past it is a deliberate simplification that can
+        // mis-locate the boundary when a run of candidates is untestable.
+        lo = mid + 1;
+      } else if (result.status === null || result.status >= 128) {
+        log(`Bisect aborted: command exited ${result.status}`);
+        outcome = { result: 'aborted', code: result.status };
+        return outcome;
       } else {
         log('  FAIL');
         firstBad = mid;
@@ -81,20 +117,38 @@ function bisectCore({ cmd, noCache = false, runCommand = defaultRunCommand, log 
     if (firstBad !== null) {
       const turn = candidates[firstBad];
       log(`turn ${turn.turn_n} introduced the failure (${(turn.head_sha || turn.snapshot_sha).slice(0, 7)})`);
-      return { result: 'found', turn };
+      outcome = { result: 'found', turn };
+    } else if (tested > 0 && skipped === tested) {
+      log('All tested candidates were untestable (exit 125)');
+      outcome = { result: 'all-skipped', tested };
+    } else {
+      log(`No failing turn found in ${tested} candidates`);
+      outcome = { result: 'clean', tested };
     }
-
-    log(`No failing turn found in ${tested} candidates`);
-    return { result: 'clean', tested };
+    return outcome;
   } finally {
     // Never rethrow from finally — that would mask the real error from the
-    // search body. On failure to restore, leave an explicit recovery hint.
-    try {
-      restoreSnapshot(pre_bisect_snapshot_sha, { branch: session.branch });
-    } catch {
-      process.stderr.write(`git turn: WARNING: failed to restore pre-bisect state; recover with: git read-tree --reset -u ${pre_bisect_snapshot_sha}^{tree}\n`);
-    }
+    // search body. On failure to restore, restorePreBisectState leaves an
+    // explicit recovery hint on stderr.
+    process.removeListener('SIGINT', onSignal);
+    process.removeListener('SIGTERM', onSignal);
+    restorePreBisectState(pre_bisect_snapshot_sha, session.branch);
     log('Restored pre-bisect state');
+
+    // Written after the search concludes and after the pre-bisect restore
+    // has been attempted, mirroring revert.js's "write the op after the
+    // state transition succeeded" discipline. Guarded so a thrown error from
+    // the search body (outcome never set) does not also throw while logging.
+    if (outcome) {
+      writeOp('bisect-end', {
+        session_id: session.session_id,
+        cmd,
+        result: outcome.result,
+        turn_n: outcome.turn ? outcome.turn.turn_n : null,
+        pre_bisect_snapshot_sha,
+        branch: session.branch,
+      });
+    }
   }
 }
 
