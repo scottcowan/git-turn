@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.1
 milestone_name: Working CLI
 status: executing
-last_updated: "2026-09-02T15:48:35.872Z"
+last_updated: "2026-09-02T16:06:24.063Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 10
-  completed_plans: 8
-  percent: 50
+  completed_plans: 9
+  percent: 90
 ---
 
 # Project State
@@ -18,7 +18,7 @@ progress:
 ## Current Position
 
 Phase: 3 (bisect-blame) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-09-02
 
@@ -31,6 +31,8 @@ Last activity: 2026-09-02
 - Separate repo from warren
 - [Phase 03-01]: Embedded head/branch/created lines in turn-fixtures.js snapshot messages to match post-commit.js real format, enabling ref-walk fallback head_sha population
 - [Phase 03-bisect-blame]: Namespace-imported blame-util to satisfy grep-based acceptance criteria requiring single-line match counts
+- [Phase 03-03]: Factored the guarded pre-bisect restore into one restorePreBisectState helper shared by finally and both signal handlers to prevent the recovery-hint string from drifting
+- [Phase 03-03]: Exit-125 (untestable) advances lo=mid+1 rather than inventing a distinct skip-branch, per the plan's canonical git-bisect narrowing instruction
 
 ## Deferred Items
 
