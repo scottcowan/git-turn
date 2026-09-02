@@ -49,20 +49,42 @@ function bisectCore({ cmd, noCache = false, runCommand = defaultRunCommand, log 
   });
 
   try {
-    let tested = 0;
     log(`Bisecting ${candidates.length} turns with: ${cmd}`);
-    for (const turn of candidates) {
+
+    // First-bad-index binary search over the topology-ordered candidates —
+    // the canonical git-bisect narrowing strategy, not a novel one. 125/null/
+    // >=128 classification is completed in Task 3; for now any nonzero status
+    // is treated as bad.
+    let lo = 0;
+    let hi = candidates.length - 1;
+    let firstBad = null;
+    let tested = 0;
+
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const turn = candidates[mid];
       restoreSnapshot(turn.snapshot_sha, { branch: session.branch });
       log(`  turn ${String(turn.turn_n).padStart(2)}  ${(turn.head_sha || turn.snapshot_sha).slice(0, 7)}  testing...`);
       const result = runCommand(cmd, repoRoot());
       tested++;
+
       if (result.status === 0) {
         log('  PASS');
+        lo = mid + 1;
       } else {
         log('  FAIL');
-        return { result: 'found', turn };
+        firstBad = mid;
+        hi = mid - 1;
       }
     }
+
+    if (firstBad !== null) {
+      const turn = candidates[firstBad];
+      log(`turn ${turn.turn_n} introduced the failure (${(turn.head_sha || turn.snapshot_sha).slice(0, 7)})`);
+      return { result: 'found', turn };
+    }
+
+    log(`No failing turn found in ${tested} candidates`);
     return { result: 'clean', tested };
   } finally {
     // Never rethrow from finally — that would mask the real error from the
