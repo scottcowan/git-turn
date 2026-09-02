@@ -2,11 +2,12 @@
 
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { rmSync, appendFileSync } = require('fs');
+const { rmSync, writeFileSync, appendFileSync } = require('fs');
+const { execFileSync } = require('child_process');
 const { join } = require('path');
 const { makeTestRepo } = require('../helpers/test-repo');
 const { ensureDirs } = require('../session');
-const { startSession, makeTurn } = require('../helpers/turn-fixtures');
+const { startSession, makeTurn, makeUntrackedTurn } = require('../helpers/turn-fixtures');
 const { closeDb } = require('../cache');
 
 describe('blame command', () => {
@@ -156,5 +157,67 @@ describe('blame command', () => {
     const lines = output.split('\n');
     // Header: "Blame: <file>", blank line, then 3 content lines = 5 total.
     assert.equal(lines.length, 5);
+  });
+
+  describe('cross-session attribution (D-02)', () => {
+    test('lines from two different sessions both show their own session prefix', () => {
+      const sessionA = startSession();
+      makeTurn(sessionA, 'A1', git);
+      makeTurn(sessionA, 'A1\nA2', git);
+
+      const sessionB = startSession();
+      makeTurn(sessionB, 'A1\nA2\nB1', git);
+      makeTurn(sessionB, 'A1\nA2\nB1\nB2', git);
+
+      const output = captureBlame(['work.txt']);
+      const prefixA = sessionA.session_id.slice(0, 8);
+      const prefixB = sessionB.session_id.slice(0, 8);
+      assert.ok(output.includes(prefixA), 'expected session A prefix in output');
+      assert.ok(output.includes(prefixB), 'expected session B prefix in output');
+
+      const lines = output.split('\n').slice(2);
+      const parsed = lines.map(parseFormattedLine);
+      const line1 = parsed.find(p => p.lineNo === 1);
+      assert.ok(line1, 'expected line 1 with content A1');
+      assert.equal(line1.content, 'A1');
+      assert.match(line1.attr, new RegExp(`^${prefixA}:1$`), 'earliest line must still carry session A prefix');
+    });
+  });
+
+  describe('untracked-snapshot fallback', () => {
+    test('untracked-only file is blamed via the annotator with the marker line', () => {
+      const session = startSession();
+      makeUntrackedTurn(session, 'x1', git, { file: 'notes.txt' });
+      // orderByCommitTopology's rev-list ordering is only deterministic
+      // across commits with distinct (second-resolution) commit timestamps
+      // (see 03-01-SUMMARY.md) — space these fixture commits >1s apart.
+      execFileSync('sleep', ['1.1']);
+      makeUntrackedTurn(session, 'x1\nx2', git, { file: 'notes.txt' });
+
+      const output = captureBlame(['notes.txt']);
+      assert.match(output, /\(untracked — annotated from turn snapshots\)/);
+
+      const lines = output.split('\n').slice(3); // header + marker + blank line
+      const parsed = lines.map(parseFormattedLine);
+      const line1 = parsed.find(p => p.lineNo === 1);
+      const line2 = parsed.find(p => p.lineNo === 2);
+      assert.ok(line1, 'expected line 1 with content x1');
+      assert.ok(line2, 'expected line 2 with content x2');
+      assert.equal(line1.content, 'x1');
+      assert.equal(line2.content, 'x2');
+    });
+  });
+
+  describe('--no-cache parity', () => {
+    test('cached and no-cache runs produce byte-identical output', () => {
+      const session = startSession();
+      makeTurn(session, 'v1', git);
+      makeTurn(session, 'v1\nv2', git);
+
+      const cached = captureBlame(['work.txt']);
+      closeDb();
+      const noCache = captureBlame(['work.txt', '--no-cache']);
+      assert.equal(cached, noCache);
+    });
   });
 });

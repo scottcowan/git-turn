@@ -58,10 +58,21 @@ function run(args) {
     return;
   }
 
-  // Not tracked in the real commit graph — Task 2 replaces this branch with
-  // the untracked-snapshot fallback (annotateFromSnapshots).
-  console.error(`git turn: no history for ${file}`);
-  process.exit(1);
+  // Untracked-snapshot fallback: real git blame has no record of this path.
+  const orderedTurns = blameUtil.orderByCommitTopology(turns);
+  const annotated = blameUtil.annotateFromSnapshots(file, orderedTurns);
+  if (annotated.length === 0) {
+    console.error(`git turn: no history for ${file}`);
+    process.exit(1);
+  }
+
+  console.log(`Blame: ${file}`);
+  console.log('(untracked — annotated from turn snapshots)');
+  console.log('');
+  for (const { line_no, content, turn } of annotated) {
+    const attr = turn ? `${turn.session_id.slice(0, 8)}:${turn.turn_n}` : '(unattributed)';
+    console.log(formatLine(attr, line_no, content));
+  }
 }
 
 module.exports = { run };
