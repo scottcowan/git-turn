@@ -210,6 +210,12 @@ function getTurns(sessionId) {
            .all(sessionId);
 }
 
+// Query all turns across all sessions, ordered for cross-session use (blame/bisect).
+function getAllTurns() {
+  const db = ensureCache();
+  return db.prepare('SELECT * FROM turns ORDER BY ts, session_id, turn_n').all();
+}
+
 // Query files touched in a given turn.
 function getTurnFiles(turnId) {
   const db = ensureCache();
@@ -228,4 +234,4 @@ function getTurnsForFile(filePath) {
   `).all(filePath);
 }
 
-module.exports = { openDb, closeDb, rebuild, ensureCache, insertTurn, getTurns, getTurnFiles, getTurnsForFile };
+module.exports = { openDb, closeDb, rebuild, ensureCache, insertTurn, getTurns, getAllTurns, getTurnFiles, getTurnsForFile };
