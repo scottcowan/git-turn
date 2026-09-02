@@ -2,23 +2,12 @@
 
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { rmSync, writeFileSync, readFileSync } = require('fs');
+const { rmSync, readFileSync } = require('fs');
 const { join } = require('path');
 const { makeTestRepo } = require('../helpers/test-repo');
-const { snapshotWorktree, updateRef } = require('../git');
-const { newSession, incrementTurn, turnRef, readOps, ensureDirs } = require('../session');
+const { newSession, readOps, ensureDirs } = require('../session');
+const { makeTurn } = require('../helpers/turn-fixtures');
 const { run } = require('./revert');
-
-// makeTurn: writes content to work.txt, commits, snapshots, updates turn ref, increments session
-function makeTurn(session, content, git) {
-  writeFileSync(join(process.cwd(), 'work.txt'), content + '\n');
-  git(['add', '.']);
-  git(['commit', '-q', '-m', 'turn ' + (session.turn_n + 1)]);
-  const { commitSha } = snapshotWorktree({ message: 'turn ' + (session.turn_n + 1) });
-  incrementTurn(session);
-  updateRef(turnRef(session.session_id, session.turn_n), commitSha);
-  return commitSha;
-}
 
 describe('revert command', () => {
   let repoDir;
