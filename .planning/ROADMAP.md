@@ -75,7 +75,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Cross-session foundation: multi-session test fixtures, `cache.getAllTurns()`, `src/blame-util.js` (turn enumeration, head_sha index, topology order, ancestry filter, hunk + porcelain parsers, untracked annotator) [wave 1] (D-02)
+- [x] 03-01-PLAN.md — Cross-session foundation: multi-session test fixtures, `cache.getAllTurns()`, `src/blame-util.js` (turn enumeration, head_sha index, topology order, ancestry filter, hunk + porcelain parsers, untracked annotator) [wave 1] (D-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -92,7 +92,7 @@ Plans:
 |-------|-----------|---------------|--------|-----------|
 | 1. Core commands | v0.1 | 6/6 | Complete | 2026-08-09 |
 | 2. SQLite read cache | v0.2 | shipped (ungoverned) | Complete | 2026-08-18 |
-| 3. bisect + blame | v0.2 | 0/4 | Planned | — |
+| 3. bisect + blame | v0.2 | 1/4 | In Progress|  |
 | 4. Prompt capture | v0.3 | 0/? | Planned | — |
 | 5. MCP server | v0.3 | 0/? | Planned | — |
 | 6. Warren integration | v1.0 | 0/? | Planned | — |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.1
 milestone_name: Working CLI
 status: executing
-last_updated: "2026-09-02T14:11:24.176Z"
-last_activity: 2026-09-02 -- Phase 3 planning complete
+last_updated: "2026-09-02T15:35:33.521Z"
+last_activity: 2026-09-02
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 7
   percent: 50
 ---
 
@@ -17,10 +17,10 @@ progress:
 
 ## Current Position
 
-Phase: Milestone v0.1 complete
-Plan: —
+Phase: 3 (bisect-blame) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-09-02 -- Phase 3 planning complete
+Last activity: 2026-09-02
 
 ## Decisions
 
@@ -29,6 +29,7 @@ Last activity: 2026-09-02 -- Phase 3 planning complete
 - jj-style op log in .git/git-turn/ops/
 - No shell interpolation — execFile only
 - Separate repo from warren
+- [Phase 03-01]: Embedded head/branch/created lines in turn-fixtures.js snapshot messages to match post-commit.js real format, enabling ref-walk fallback head_sha population
 
 ## Deferred Items
 
