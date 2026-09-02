@@ -79,7 +79,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02-PLAN.md — `git turn blame <file>`: per-line attribution via real `git blame` + head_sha→turn index, cross-session scope, untracked-snapshot fallback [wave 2] (D-01, D-02)
+- [x] 03-02-PLAN.md — `git turn blame <file>`: per-line attribution via real `git blame` + head_sha→turn index, cross-session scope, untracked-snapshot fallback [wave 2] (D-01, D-02)
 - [ ] 03-03-PLAN.md — `git turn bisect <cmd>`: clean-worktree gate, binary search over HEAD-reachable candidates, live progress, guaranteed restore, exit-code convention [wave 2] (D-03, D-04, D-05)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -92,7 +92,7 @@ Plans:
 |-------|-----------|---------------|--------|-----------|
 | 1. Core commands | v0.1 | 6/6 | Complete | 2026-08-09 |
 | 2. SQLite read cache | v0.2 | shipped (ungoverned) | Complete | 2026-08-18 |
-| 3. bisect + blame | v0.2 | 1/4 | In Progress|  |
+| 3. bisect + blame | v0.2 | 2/4 | In Progress|  |
 | 4. Prompt capture | v0.3 | 0/? | Planned | — |
 | 5. MCP server | v0.3 | 0/? | Planned | — |
 | 6. Warren integration | v1.0 | 0/? | Planned | — |
