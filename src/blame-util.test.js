@@ -4,13 +4,16 @@ const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { rmSync } = require('fs');
 const { makeTestRepo } = require('./helpers/test-repo');
-const { startSession, makeTurn } = require('./helpers/turn-fixtures');
+const { startSession, makeTurn, makeUntrackedTurn } = require('./helpers/turn-fixtures');
 const {
   listAllTurns,
   listAllTurnsFromRefs,
   buildHeadShaIndex,
   isAncestor,
   orderByCommitTopology,
+  parseHunkHeader,
+  parseBlamePorcelain,
+  annotateFromSnapshots,
 } = require('./blame-util');
 
 describe('blame-util cross-session enumeration', () => {
@@ -145,5 +148,93 @@ describe('blame-util cross-session enumeration', () => {
 
     const ordered = orderByCommitTopology(turns);
     assert.equal(ordered.length, 2);
+  });
+});
+
+describe('blame-util parsers', () => {
+  test('parseHunkHeader parses a standard two-sided hunk header', () => {
+    assert.deepEqual(parseHunkHeader('@@ -1,3 +1,4 @@'), {
+      oldStart: 1, oldCount: 3, newStart: 1, newCount: 4,
+    });
+  });
+
+  test('parseHunkHeader defaults omitted counts to 1', () => {
+    assert.deepEqual(parseHunkHeader('@@ -5 +5 @@'), {
+      oldStart: 5, oldCount: 1, newStart: 5, newCount: 1,
+    });
+  });
+
+  test('parseHunkHeader parses a hunk with a trailing section heading', () => {
+    assert.deepEqual(parseHunkHeader('@@ -0,0 +1,2 @@ some context'), {
+      oldStart: 0, oldCount: 0, newStart: 1, newCount: 2,
+    });
+  });
+
+  test('parseHunkHeader returns null for a non-hunk line', () => {
+    assert.equal(parseHunkHeader('not a hunk'), null);
+  });
+
+  test('parseBlamePorcelain parses a two-line porcelain sample', () => {
+    const sha1 = 'a'.repeat(40);
+    const sha2 = 'b'.repeat(40);
+    const sample = [
+      `${sha1} 1 1 2`,
+      'author Test',
+      'summary turn 1',
+      '\tfirst line',
+      `${sha2} 2 2`,
+      'author Test',
+      '\tsecond line',
+    ].join('\n');
+
+    const records = parseBlamePorcelain(sample);
+    assert.deepEqual(records, [
+      { sha: sha1, line_no: 1, content: 'first line' },
+      { sha: sha2, line_no: 2, content: 'second line' },
+    ]);
+  });
+
+  test('parseBlamePorcelain returns [] for empty input', () => {
+    assert.deepEqual(parseBlamePorcelain(''), []);
+  });
+});
+
+describe('annotateFromSnapshots', () => {
+  let repoDir;
+  let origCwd;
+  let git;
+
+  beforeEach(() => {
+    origCwd = process.cwd();
+    const repo = makeTestRepo();
+    repoDir = repo.dir;
+    git = repo.git;
+    process.chdir(repoDir);
+  });
+
+  afterEach(() => {
+    require('./cache').closeDb();
+    process.chdir(origCwd);
+    rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  test('attributes untracked-only lines to the turn that introduced/appended them', () => {
+    const { execFileSync } = require('child_process');
+    const session = startSession();
+    const t1 = makeUntrackedTurn(session, 'line1\nline2', git, { file: 'notes.txt' });
+    execFileSync('sleep', ['1.1']);
+    const t2 = makeUntrackedTurn(session, 'line1\nline2', git, { file: 'notes.txt' });
+    execFileSync('sleep', ['1.1']);
+    const t3 = makeUntrackedTurn(session, 'line1\nline2\nline3', git, { file: 'notes.txt' });
+
+    const turns = orderByCommitTopology(listAllTurns());
+    const result = annotateFromSnapshots('notes.txt', turns);
+
+    assert.deepEqual(result.map(r => r.line_no), [1, 2, 3]);
+    assert.deepEqual(result.map(r => r.content), ['line1', 'line2', 'line3']);
+    assert.equal(result[0].turn.turn_n, t1.turn_n);
+    assert.equal(result[1].turn.turn_n, t1.turn_n);
+    assert.equal(result[2].turn.turn_n, t3.turn_n);
+    void t2;
   });
 });

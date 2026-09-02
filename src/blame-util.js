@@ -115,10 +115,90 @@ function orderByCommitTopology(turns) {
   });
 }
 
+// Parse a unified-diff hunk header line, e.g. "@@ -1,3 +1,4 @@ some context".
+// The `,count` suffix is omitted by git when the count is exactly 1 — the
+// regex makes that group optional and defaults it to 1 (never 0/NaN).
+function parseHunkHeader(line) {
+  const m = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
+  if (!m) return null;
+  return {
+    oldStart: parseInt(m[1], 10),
+    oldCount: m[2] !== undefined ? parseInt(m[2], 10) : 1,
+    newStart: parseInt(m[3], 10),
+    newCount: m[4] !== undefined ? parseInt(m[4], 10) : 1,
+  };
+}
+
+// Parse `git blame --porcelain` output into per-line records. Porcelain
+// alternates a header line "<40-hex-sha> <origLine> <finalLine> [<n>]",
+// zero or more "key value" metadata lines, then exactly one TAB-prefixed
+// content line.
+function parseBlamePorcelain(text) {
+  if (!text) return [];
+  const records = [];
+  let currentSha = null;
+  let currentFinalLine = null;
+  for (const line of text.split('\n')) {
+    const header = /^([0-9a-f]{40}) (\d+) (\d+)/.exec(line);
+    if (header) {
+      currentSha = header[1];
+      currentFinalLine = parseInt(header[3], 10);
+      continue;
+    }
+    if (line.startsWith('\t')) {
+      records.push({ sha: currentSha, line_no: currentFinalLine, content: line.slice(1) });
+    }
+  }
+  return records;
+}
+
+// Forward-annotate an untracked-only file by walking turns oldest-first and
+// replaying each turn's unified=0 diff against the previous snapshot. Used
+// only as the fallback for files with no real git commit history (git blame
+// cannot see untracked snapshot-only content).
+function annotateFromSnapshots(file, turns) {
+  let attributions = [];
+  let prevSnapshotSha = EMPTY_TREE;
+
+  for (const turn of turns) {
+    const diff = gitSafe(['diff', '--unified=0', prevSnapshotSha, turn.snapshot_sha, '--', file]);
+    prevSnapshotSha = turn.snapshot_sha;
+    if (!diff) continue;
+
+    for (const line of diff.split('\n')) {
+      const hunk = parseHunkHeader(line);
+      if (!hunk) continue;
+      const { newStart, newCount, oldCount } = hunk;
+      // Every hunk replaces oldCount old-side lines with newCount new-side
+      // lines at position newStart-1 (newCount === 0 for a pure deletion).
+      // git's own newStart is already expressed in the running new-file
+      // coordinates for this diff, so no cross-hunk offset bookkeeping is
+      // needed — verified empirically against a two-hunk fixture.
+      const insertion = new Array(newCount).fill(turn);
+      attributions.splice(newStart - 1, oldCount, ...insertion);
+    }
+  }
+
+  if (turns.length === 0) return [];
+  const lastTurn = turns[turns.length - 1];
+  const finalContent = gitSafe(['show', lastTurn.snapshot_sha + ':' + file]) || '';
+  const lines = finalContent.split('\n');
+  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+
+  return lines.map((content, i) => ({
+    line_no: i + 1,
+    content,
+    turn: attributions[i] || null,
+  }));
+}
+
 module.exports = {
   listAllTurns,
   listAllTurnsFromRefs,
   buildHeadShaIndex,
   isAncestor,
   orderByCommitTopology,
+  parseHunkHeader,
+  parseBlamePorcelain,
+  annotateFromSnapshots,
 };
