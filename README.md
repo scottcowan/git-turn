@@ -34,12 +34,12 @@ git turn status                  Session ID, turn count, hook health
 git turn diff <N>                Diff turn N-1 vs turn N
 git turn diff <N> <M>            Diff any two turns
 git turn show <N>                Full diff for turn N
+git turn blame <file>            Which turn last touched each line
+git turn bisect <cmd>            Binary-search turns for the one that broke <cmd>
 git turn revert <N>              Restore worktree to turn N state
 git turn redo                    Undo the last revert
 git turn gc [--keep-sessions N]  Prune old session refs (default: keep 10)
 ```
-
-Coming in v0.2: `git turn blame <file>`, `git turn bisect <cmd>`
 
 ## Example
 
@@ -61,6 +61,30 @@ Reverted to turn 2
 $ git turn redo
 Redo complete (restored state before revert to turn 2)
 ```
+
+## Blame and bisect
+
+```sh
+$ git turn blame src/auth.js
+Blame: src/auth.js
+
+f17a78b9:1                  1) const jwt = require('jsonwebtoken');
+f17a78b9:2                  2) function sign(payload) {
+abc1234 (not a turn)        3)   return jwt.sign(payload, secret);
+
+$ git turn bisect 'npm test'
+Bisecting 7 turns with: npm test
+  turn  3  ba2bdc4  testing...
+  PASS
+  turn  5  7552932  testing...
+  FAIL
+turn 5 introduced the failure (7552932)
+Restored pre-bisect state
+```
+
+Attribution spans every session in the repo, not just the current one — a line committed in an earlier session still shows that session's turn label. Lines from commits made before `git turn init` show as `(not a turn)`; uncommitted lines show as `(uncommitted)`.
+
+`bisect` requires a clean worktree and refuses to start otherwise. `<cmd>` runs through your own shell with your own privileges — exactly as `git bisect run <cmd>` does — so only bisect commands you'd be comfortable running directly yourself.
 
 ## Storage
 

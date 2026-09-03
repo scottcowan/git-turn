@@ -17,8 +17,8 @@ Commands:
   log                     List all turns in current session
   show <N>                Full diff for turn N (with prompt if available)
   diff <N> <M>            Diff between turn N and turn M
-  blame <file>            Which turn last touched each line
-  bisect <cmd>            Binary search for turn that broke a command
+  blame <file> [--no-cache]  Which turn last touched each line
+  bisect <cmd> [--no-cache]  Find the first turn where <cmd> fails
   revert <N>              Restore worktree to turn N state
   redo                    Undo the last revert
   branch --from <N>       New worktree from turn N snapshot
