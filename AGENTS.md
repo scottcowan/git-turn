@@ -10,7 +10,7 @@ Run commands as `git turn <command>` (or `node <repo>/bin/git-turn <command>` if
 git turn init
 ```
 
-Installs a post-commit hook, starts a session, and sets up refs. Safe to re-run. Works in bare+worktree repos (finds hooks dir via `--git-common-dir`).
+Installs a post-commit hook, starts a session, and sets up refs. Safe to re-run. Works in bare+worktree repos (finds hooks dir via `--git-common-dir`). Respects `core.hooksPath` (Husky, lefthook, ...) — installs there instead of the default hooks dir, appending to an existing foreign hook file rather than overwriting it. If `git turn status` ever reports a hook as `shadowed by core.hooksPath=...`, a stale git-turn hook exists at the default location that git will never invoke — re-run `git turn init` to fix.
 
 ## Implemented commands
 

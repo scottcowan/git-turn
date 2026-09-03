@@ -2,8 +2,36 @@
 
 const fs = require('fs');
 const path = require('path');
-const { gitDir } = require('../git');
+const { gitDir, hooksDir, gitSafe } = require('../git');
 const { readSession, listTurns } = require('../session');
+
+function checkHookStatus() {
+  const hooksPathCfg = gitSafe(['config', '--get', 'core.hooksPath']);
+  const activePath = path.join(hooksDir(), 'post-commit');
+
+  let hookStatus = 'missing';
+  if (fs.existsSync(activePath)) {
+    const content = fs.readFileSync(activePath, 'utf8');
+    hookStatus = content.includes('git-turn') ? 'installed' : 'not from git-turn';
+  }
+
+  // core.hooksPath (Husky, lefthook, ...) redirects git away from the default
+  // hooks dir. If a git-turn hook is sitting there unused, it will never fire —
+  // flag that explicitly instead of reporting a misleading "installed"/"missing".
+  if (hooksPathCfg && hookStatus !== 'installed') {
+    const gd = gitDir();
+    const common = gitSafe(['rev-parse', '--git-common-dir']) || gd;
+    const defaultPath = path.join(common, 'hooks', 'post-commit');
+    if (defaultPath !== activePath && fs.existsSync(defaultPath)) {
+      const defaultContent = fs.readFileSync(defaultPath, 'utf8');
+      if (defaultContent.includes('git-turn')) {
+        return `shadowed by core.hooksPath=${hooksPathCfg} (hook exists at ${defaultPath} but git never reads it — re-run 'git turn init')`;
+      }
+    }
+  }
+
+  return hookStatus;
+}
 
 function run(args) {
   const session = readSession();
@@ -13,14 +41,7 @@ function run(args) {
   }
 
   const turns = listTurns(session.session_id);
-
-  const gd = gitDir();
-  const hookPath = path.join(gd, 'hooks', 'post-commit');
-  let hookStatus = 'missing';
-  if (fs.existsSync(hookPath)) {
-    const content = fs.readFileSync(hookPath, 'utf8');
-    hookStatus = content.includes('git-turn') ? 'installed' : 'not from git-turn';
-  }
+  const hookStatus = checkHookStatus();
 
   console.log('Session:  ' + session.session_id);
   console.log('Branch:   ' + session.branch);

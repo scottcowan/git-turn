@@ -2,12 +2,12 @@
 
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { rmSync, existsSync } = require('fs');
+const { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } = require('fs');
 const { join } = require('path');
 const { makeTestRepo } = require('../helpers/test-repo');
 
 const { run } = require('./init');
-const { gitSafe } = require('../git');
+const { git, gitSafe } = require('../git');
 
 describe('init command', () => {
   let dir;
@@ -54,5 +54,48 @@ describe('init command', () => {
     run([]);
     // Second call should not throw (already-installed path prints a message, not an error exit)
     assert.doesNotThrow(() => run([]));
+  });
+
+  test('init installs into core.hooksPath when set (e.g. Husky), not the default hooks dir', () => {
+    git(['config', 'core.hooksPath', '.husky']);
+    mkdirSync(join(dir, '.husky'), { recursive: true });
+
+    run([]);
+
+    const husky = join(dir, '.husky', 'post-commit');
+    assert.ok(existsSync(husky), 'hook should be installed at the core.hooksPath location');
+    assert.ok(readFileSync(husky, 'utf8').includes('git-turn'));
+
+    const defaultPath = join(dir, '.git', 'hooks', 'post-commit');
+    assert.ok(!existsSync(defaultPath), 'default hooks dir should be untouched when core.hooksPath is set');
+  });
+
+  test('init appends to an existing foreign hook at core.hooksPath instead of overwriting it', () => {
+    git(['config', 'core.hooksPath', '.husky']);
+    mkdirSync(join(dir, '.husky'), { recursive: true });
+    const husky = join(dir, '.husky', 'post-commit');
+    writeFileSync(husky, '#!/usr/bin/env sh\necho "husky ran"\n');
+
+    run([]);
+
+    const content = readFileSync(husky, 'utf8');
+    assert.ok(content.includes('husky ran'), 'existing hook content must be preserved');
+    assert.ok(content.includes('git-turn'), 'git-turn call must be appended');
+  });
+
+  test('init is idempotent when appended to a foreign hook at core.hooksPath', () => {
+    git(['config', 'core.hooksPath', '.husky']);
+    mkdirSync(join(dir, '.husky'), { recursive: true });
+    writeFileSync(join(dir, '.husky', 'post-commit'), '#!/usr/bin/env sh\necho "husky ran"\n');
+
+    run([]);
+    assert.doesNotThrow(() => run([]));
+
+    const content = readFileSync(join(dir, '.husky', 'post-commit'), 'utf8');
+    // Count the append marker, not bare "git-turn" — the resolved hook script's
+    // absolute path can itself contain "git-turn" (e.g. this repo's own checkout
+    // dir), which would inflate a substring count unrelated to append idempotency.
+    const occurrences = content.split('appended by: git turn init').length - 1;
+    assert.equal(occurrences, 1, 'git-turn call should be appended only once across repeated init runs');
   });
 });

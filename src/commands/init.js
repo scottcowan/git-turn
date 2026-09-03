@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { gitDir, gitSafe, git } = require('../git');
+const { hooksDir, gitSafe, git } = require('../git');
 const { newSession, ensureDirs } = require('../session');
 
 // Absolute path to post-commit.js, resolved at install time so the hook
@@ -17,24 +17,32 @@ require(${JSON.stringify(hookSrc)}).run();
 `;
 };
 
-function hooksDir() {
-  const gd = gitDir();
-  // In a git worktree, gitDir() returns .bare/worktrees/<name> which has no hooks/.
-  // The shared hooks live in the common dir (the bare repo root).
-  // git rev-parse --git-common-dir always returns the canonical hooks location.
-  const common = gitSafe(['rev-parse', '--git-common-dir']) || gd;
-  return path.join(common, 'hooks');
-}
+// Line appended to a hook file git-turn doesn't own outright (e.g. Husky's
+// .husky/post-commit, when core.hooksPath points there). Shell-safe: quoted
+// as a single-quoted string with any embedded single quotes escaped, so it
+// runs correctly as the trailing command in a POSIX sh script.
+const HOOK_APPEND_LINE = () => {
+  const hookSrc = path.resolve(__dirname, '../hooks/post-commit.js');
+  const jsExpr = `require(${JSON.stringify(hookSrc)}).run()`;
+  const shellSafeExpr = jsExpr.replace(/'/g, `'\\''`);
+  return `\n# git-turn post-commit hook (appended by: git turn init)\nnode -e '${shellSafeExpr}'\n`;
+};
 
 function run(args) {
   const hDir = hooksDir();
   const hookPath = path.join(hDir, 'post-commit');
+  const hooksPathCfg = gitSafe(['config', '--get', 'core.hooksPath']);
 
   // Install hook
   if (fs.existsSync(hookPath)) {
     const existing = fs.readFileSync(hookPath, 'utf8');
     if (existing.includes('git-turn')) {
       console.log('git turn: hook already installed');
+    } else if (hooksPathCfg) {
+      // core.hooksPath points at a file a hook manager (Husky, lefthook, ...)
+      // already owns — append rather than overwrite so its existing hooks keep running.
+      fs.appendFileSync(hookPath, HOOK_APPEND_LINE());
+      console.log(`✓ Appended git-turn call to existing hook (core.hooksPath=${hooksPathCfg}): ${hookPath}`);
     } else {
       console.error('git turn: post-commit hook already exists (not from git-turn)');
       console.error(`Edit ${hookPath} to add: require('git-turn/src/hooks/post-commit').run();`);
@@ -43,7 +51,11 @@ function run(args) {
   } else {
     fs.mkdirSync(hDir, { recursive: true });
     fs.writeFileSync(hookPath, HOOK_SCRIPT(), { mode: 0o755 });
-    console.log(`✓ Installed post-commit hook: ${hookPath}`);
+    if (hooksPathCfg) {
+      console.log(`✓ Installed post-commit hook: ${hookPath} (core.hooksPath=${hooksPathCfg})`);
+    } else {
+      console.log(`✓ Installed post-commit hook: ${hookPath}`);
+    }
   }
 
   // Set notes.expiry=never

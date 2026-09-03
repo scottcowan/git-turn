@@ -26,6 +26,8 @@ That installs the post-commit hook. Your next agent session starts capturing tur
 
 **Bare repos with git worktrees:** `git turn init` works in any worktree — it finds the shared hooks directory automatically via `git rev-parse --git-common-dir`. Run it once from any worktree and the hook fires for all of them.
 
+**Repos using Husky, lefthook, or another `core.hooksPath` manager:** `git turn init` detects `core.hooksPath` and installs there instead of the default hooks dir — a hook installed at the default location is silently never invoked once `core.hooksPath` is set elsewhere. If a hook file already exists at that path (e.g. Husky's own `post-commit`), git-turn appends its own call rather than overwriting it. Run `git turn status` afterward — it reports `shadowed by core.hooksPath=...` if it ever finds a stale git-turn hook sitting at the default location where git will never read it.
+
 ## Commands
 
 ```

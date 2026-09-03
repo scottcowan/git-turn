@@ -33,6 +33,23 @@ function gitDir() {
   return git(['rev-parse', '--git-dir']);
 }
 
+// Resolve the directory git will actually read hooks from. Respects
+// core.hooksPath (e.g. Husky, lefthook) instead of assuming the default
+// <common-dir>/hooks — a hook installed at the default location is silently
+// never invoked when core.hooksPath points elsewhere.
+function hooksDir() {
+  const hooksPathCfg = gitSafe(['config', '--get', 'core.hooksPath']);
+  if (hooksPathCfg) {
+    if (path.isAbsolute(hooksPathCfg)) return hooksPathCfg;
+    const top = gitSafe(['rev-parse', '--show-toplevel']) || process.cwd();
+    return path.resolve(top, hooksPathCfg);
+  }
+  // In a git worktree, gitDir() returns .bare/worktrees/<name> which has no hooks/.
+  // The shared hooks live in the common dir (the bare repo root).
+  const common = gitSafe(['rev-parse', '--git-common-dir']) || gitDir();
+  return path.join(common, 'hooks');
+}
+
 function headSha() {
   return gitSafe(['rev-parse', 'HEAD']) || '0'.repeat(40);
 }
@@ -148,7 +165,7 @@ function getNote(ref, commitSha) {
 }
 
 module.exports = {
-  git, gitSafe, repoRoot, gitDir, headSha, currentBranch,
+  git, gitSafe, repoRoot, gitDir, hooksDir, headSha, currentBranch,
   updateRef, deleteRef, listRefs,
   snapshotWorktree, restoreSnapshot,
   addNote, getNote,

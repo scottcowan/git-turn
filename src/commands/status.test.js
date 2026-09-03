@@ -80,4 +80,30 @@ describe('status command', () => {
     const output = captureStatus();
     assert.ok(output.includes('not from git-turn'), 'hook status should be not from git-turn');
   });
+
+  test('hook shows installed when git-turn hook lives at core.hooksPath', () => {
+    const { git } = require('../git');
+    git(['config', 'core.hooksPath', '.husky']);
+    mkdirSync(join(dir, '.husky'), { recursive: true });
+    writeFileSync(join(dir, '.husky', 'post-commit'), '#!/bin/sh\n# git-turn\n');
+
+    const output = captureStatus();
+    assert.ok(output.includes('installed'), 'hook status should be installed when found at core.hooksPath');
+    assert.ok(!output.includes('shadowed'), 'should not report shadowed when the active hook is git-turn\'s own');
+  });
+
+  test('hook shows shadowed when a git-turn hook exists at the default dir but core.hooksPath redirects elsewhere', () => {
+    const { git } = require('../git');
+    const defaultHookDir = join(dir, '.git', 'hooks');
+    mkdirSync(defaultHookDir, { recursive: true });
+    writeFileSync(join(defaultHookDir, 'post-commit'), '#!/bin/sh\n# git-turn\n');
+
+    git(['config', 'core.hooksPath', '.husky']);
+    mkdirSync(join(dir, '.husky'), { recursive: true });
+    // No post-commit at .husky — git will never see the default-dir git-turn hook.
+
+    const output = captureStatus();
+    assert.ok(output.includes('shadowed'), 'hook status should flag the dead default-dir hook as shadowed');
+    assert.ok(output.includes('core.hooksPath=.husky'), 'shadowed message should name the overriding config value');
+  });
 });
