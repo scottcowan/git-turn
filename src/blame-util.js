@@ -94,6 +94,17 @@ function isAncestor(sha, rev = 'HEAD') {
   return gitSafe(['merge-base', '--is-ancestor', sha, rev]) !== null;
 }
 
+// Bulk equivalent of calling isAncestor(sha, rev) once per candidate — one
+// `git rev-list` spawn instead of N `git merge-base --is-ancestor` spawns.
+// Same reachability semantics: a sha is in the set iff it's reachable by
+// walking `rev`'s ancestry (merge commits included), which is exactly what
+// `git rev-list <rev>` enumerates. Used by bisect's candidate filter, where
+// N is the turn count and per-turn spawns compound fast on large histories.
+function reachableFrom(rev = 'HEAD') {
+  const out = gitSafe(['rev-list', rev]);
+  return new Set(out ? out.split('\n').filter(Boolean) : []);
+}
+
 // Order turns oldest-first by real commit ancestry of head_sha, never by
 // walking the snapshot-ref DAG (snapshot parents are real HEAD, not the
 // prior snapshot — see 03-RESEARCH.md Pitfall 1).
@@ -197,6 +208,7 @@ module.exports = {
   listAllTurnsFromRefs,
   buildHeadShaIndex,
   isAncestor,
+  reachableFrom,
   orderByCommitTopology,
   parseHunkHeader,
   parseBlamePorcelain,

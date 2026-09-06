@@ -44,9 +44,13 @@ function bisectCore({ cmd, noCache = false, runCommand = defaultRunCommand, log 
 
   // Candidates must be HEAD-reachable — cross-session turns can belong to a
   // branch that was force-pushed away or deleted, and restoreSnapshot on
-  // such a turn either fails or checks out unrelated content.
+  // such a turn either fails or checks out unrelated content. One
+  // reachableFrom() spawn covers all turns instead of one isAncestor()
+  // spawn per turn — same semantics, far fewer child processes on repos
+  // with many turns.
+  const reachable = blameUtil.reachableFrom();
   const candidates = blameUtil.orderByCommitTopology(
-    blameUtil.listAllTurns({ noCache }).filter(t => t.head_sha && blameUtil.isAncestor(t.head_sha))
+    blameUtil.listAllTurns({ noCache }).filter(t => t.head_sha && reachable.has(t.head_sha))
   );
   if (candidates.length === 0) {
     throw new Error('no turn snapshots reachable from HEAD to bisect');

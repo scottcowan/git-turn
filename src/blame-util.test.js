@@ -10,6 +10,7 @@ const {
   listAllTurnsFromRefs,
   buildHeadShaIndex,
   isAncestor,
+  reachableFrom,
   orderByCommitTopology,
   parseHunkHeader,
   parseBlamePorcelain,
@@ -120,6 +121,29 @@ describe('blame-util cross-session enumeration', () => {
   test('isAncestor is false for the all-zeros sha rather than throwing', () => {
     assert.doesNotThrow(() => {
       assert.equal(isAncestor('0'.repeat(40)), false);
+    });
+  });
+
+  test('reachableFrom matches isAncestor for each case, in a single spawn', () => {
+    const startBranch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+    const session = startSession();
+    const onBranch = makeTurn(session, 'v1', git);
+
+    git(['checkout', '-b', 'sidebranch']);
+    const sideSession = startSession();
+    const offBranch = makeTurn(sideSession, 'side', git);
+    git(['checkout', startBranch]);
+
+    const reachable = reachableFrom();
+    assert.equal(reachable.has(onBranch.headSha), true);
+    assert.equal(reachable.has(offBranch.headSha), false);
+    assert.equal(reachable.has('0'.repeat(40)), false);
+  });
+
+  test('reachableFrom returns an empty set for an unreachable rev rather than throwing', () => {
+    assert.doesNotThrow(() => {
+      const reachable = reachableFrom('does-not-exist');
+      assert.equal(reachable.size, 0);
     });
   });
 

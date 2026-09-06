@@ -67,7 +67,7 @@ describe('bisect command', () => {
   test('throws when no candidate is reachable from HEAD', () => {
     makeTurn(session, 'v1', git);
     // An orphan branch shares no ancestry with the turn's head_sha, so no
-    // candidate survives the isAncestor filter.
+    // candidate survives the reachableFrom() filter.
     git(['checkout', '--orphan', 'other']);
     git(['commit', '--allow-empty', '-q', '-m', 'orphan root']);
 
