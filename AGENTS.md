@@ -44,13 +44,23 @@ Undoes the last `revert`, restoring the worktree to its pre-revert state.
 ### `git turn gc [--keep-sessions N] [--rebuild]`
 Prunes session refs older than the N most recent sessions (default 10). `--rebuild` forces the SQLite cache to rebuild from refs/notes instead of pruning.
 
+### `git turn session new [--from <session_id>:<turn_n>]`
+Starts a new session. `--from` records a durable `forked_from: {session_id, turn_n}` lineage link (written to `refs/git-turn/sessions/{id}/meta`, not just the mutable `session.json`) — validates the referenced turn actually exists before creating the session. Without `--from`, behaves like the session-creation half of `init` (no hook/format-blob work, just a fresh session).
+
+### `git turn session list`
+Lists every session that has ever had a turn or meta ref (not just the currently-active one) — session id, turn count, and `forked_from` lineage if the session was created with `--from`. The current session is marked with `*`.
+
+### `git turn export [--since <ref>] [--output <path>]`
+Bundles just the git-turn ref namespace (`refs/git-turn/sessions/**`, `refs/notes/git-turn`, `refs/git-turn/format`) into a `git bundle` file — for handing turn/session history to another clone without granting full repo access. `--since <ref>` makes it incremental (excludes everything already reachable from `<ref>`); the receiving side needs that ref locally to unbundle an incremental export. Default output is `git-turn-export-<timestamp>.bundle` in the current directory. Read-only/export-only — there is no import/merge command yet, pull the refs in with `git fetch <bundle> 'refs/git-turn/*:refs/git-turn/*' 'refs/notes/git-turn:refs/notes/git-turn'`.
+
 ## Not yet implemented
 
-`branch --from <N>`, `session new|list` are listed in `--help` but exit with "not yet implemented" — do not rely on them.
+`branch --from <N>` is listed in `--help` but exits with "not yet implemented" — do not rely on it. (Note: `session new --from` exists and covers lineage tracking; `branch --from` is the separate, heavier operation of creating a new worktree from a turn snapshot, per ROADMAP Phase 6 — blocked on the Warren API.)
 
 ## Storage model (for anything reading git internals directly)
 
 - `refs/git-turn/sessions/{id}/turn-{N}` — snapshot refs, one per turn
+- `refs/git-turn/sessions/{id}/meta` — durable per-session metadata blob (`{session_id, started, branch, forked_from}`); unlike `session.json`, this persists after the session is no longer active, so `session list` can always show fork lineage
 - `refs/notes/git-turn` — per-commit metadata (session id, cc_session, timestamp, usage); **overwritten in place** on each turn, not appended — prior values only survive in the notes-ref commit history (`git log refs/notes/git-turn`)
 - `refs/git-turn/format` — a discovery blob (JSON: version, tool, schema, ref_pattern, notes_ref) so other tooling can detect git-turn without guessing ref layout
 - `.git/git-turn/ops/` — revert/redo operation log

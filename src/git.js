@@ -13,6 +13,7 @@ function git(args, opts = {}) {
     encoding: 'utf8',
     cwd: opts.cwd || process.cwd(),
     env: opts.env ? { ...process.env, ...opts.env } : process.env,
+    ...(opts.input !== undefined ? { input: opts.input } : {}),
     ...(opts.stdio ? { stdio: opts.stdio } : {}),
   }).trim();
 }
@@ -154,6 +155,16 @@ function restoreSnapshot(snapshotSha, { branch } = {}) {
   git(['read-tree', '--reset', '-u', tree]);
 }
 
+// Write arbitrary content as a blob object. Returns the blob sha.
+function writeBlob(content) {
+  return git(['hash-object', '-w', '--stdin'], { input: content });
+}
+
+// Read a blob object's content by sha. Returns null if it doesn't exist.
+function readBlob(sha) {
+  return gitSafe(['cat-file', 'blob', sha]);
+}
+
 // Write a git note on a commit
 function addNote(ref, commitSha, message) {
   git(['notes', `--ref=${ref}`, 'add', '-f', '-m', message, commitSha]);
@@ -168,5 +179,6 @@ module.exports = {
   git, gitSafe, repoRoot, gitDir, hooksDir, headSha, currentBranch,
   updateRef, deleteRef, listRefs,
   snapshotWorktree, restoreSnapshot,
+  writeBlob, readBlob,
   addNote, getNote,
 };
