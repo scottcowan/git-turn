@@ -1,8 +1,13 @@
 'use strict';
 
-const { describe, test } = require('node:test');
+const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const { rmSync } = require('fs');
 const heatmap = require('./heatmap');
+const { makeTestRepo } = require('../helpers/test-repo');
+const { ensureDirs } = require('../session');
+const { startSession, makeTurn } = require('../helpers/turn-fixtures');
+const { closeDb } = require('../cache');
 
 // Anchors every fixture timestamp to a LOCAL wall-clock time so assertions
 // stay TZ-independent (never hardcode a UTC-derived string — see
@@ -226,5 +231,266 @@ describe('buildWeekColumns', () => {
         assert.equal(slot.count, 0);
       }
     }
+  });
+});
+
+describe('densityGlyph / densityAnsi', () => {
+  test('densityGlyph maps levels 0..4 to the expected ASCII glyphs', () => {
+    assert.equal(heatmap.densityGlyph(0), ' ');
+    assert.equal(heatmap.densityGlyph(1), '.');
+    assert.equal(heatmap.densityGlyph(2), ':');
+    assert.equal(heatmap.densityGlyph(3), '+');
+    assert.equal(heatmap.densityGlyph(4), '#');
+  });
+
+  test('densityGlyph does not throw on an out-of-range level', () => {
+    assert.doesNotThrow(() => heatmap.densityGlyph(-1));
+    assert.doesNotThrow(() => heatmap.densityGlyph(99));
+  });
+
+  test('densityAnsi maps levels 0..4 to the expected 256-color palette indices', () => {
+    assert.equal(heatmap.densityAnsi(0), 236);
+    assert.equal(heatmap.densityAnsi(1), 22);
+    assert.equal(heatmap.densityAnsi(2), 28);
+    assert.equal(heatmap.densityAnsi(3), 34);
+    assert.equal(heatmap.densityAnsi(4), 40);
+  });
+
+  test('densityAnsi does not throw on an out-of-range level', () => {
+    assert.doesNotThrow(() => heatmap.densityAnsi(-1));
+    assert.doesNotThrow(() => heatmap.densityAnsi(99));
+  });
+});
+
+describe('renderGrid', () => {
+  function makeGrid(dayMap = new Map(), weeks = 5) {
+    return heatmap.buildWeekColumns(dayMap, { endDate: '2026-09-07', weeks });
+  }
+
+  test('returns exactly 9 lines: 1 month-label line + 7 weekday rows + 1 legend line', () => {
+    const grid = makeGrid();
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    assert.equal(lines.length, 9);
+  });
+
+  test('useColor: false emits no \\x1b anywhere (D-01 no-color degradation)', () => {
+    const grid = makeGrid(new Map([['2026-09-07', 4]]));
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    assert.ok(!lines.some(line => /\x1b/.test(line)));
+  });
+
+  test('useColor: true emits at least one 48;5; sequence with balanced open/reset counts per line (Pitfall 3)', () => {
+    const grid = makeGrid(new Map([['2026-09-07', 4]]));
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: true });
+    assert.ok(lines.some(line => /\x1b\[48;5;/.test(line)));
+    for (const line of lines) {
+      const opens = (line.match(/\x1b\[48;5;/g) || []).length;
+      const resets = (line.match(/\x1b\[0m/g) || []).length;
+      assert.equal(opens, resets, `unbalanced ANSI in line: ${JSON.stringify(line)}`);
+    }
+  });
+
+  test('each of the 7 weekday rows starts with a 4-character label prefix; Mon/Wed/Fri carry the abbreviation, others are blank', () => {
+    const grid = makeGrid();
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    const weekdayRows = lines.slice(1, 8);
+    assert.equal(weekdayRows.length, 7);
+    assert.equal(weekdayRows[0].slice(0, 4), '    ');
+    assert.equal(weekdayRows[1].slice(0, 4), 'Mon ');
+    assert.equal(weekdayRows[2].slice(0, 4), '    ');
+    assert.equal(weekdayRows[3].slice(0, 4), 'Wed ');
+    assert.equal(weekdayRows[4].slice(0, 4), '    ');
+    assert.equal(weekdayRows[5].slice(0, 4), 'Fri ');
+    assert.equal(weekdayRows[6].slice(0, 4), '    ');
+  });
+
+  test('each weekday row cell region is grid.length * CELL_WIDTH characters wide when useColor is false', () => {
+    const weeks = 5;
+    const grid = makeGrid(new Map(), weeks);
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    const weekdayRows = lines.slice(1, 8);
+    for (const row of weekdayRows) {
+      assert.equal(row.length - heatmap.LABEL_WIDTH, weeks * heatmap.CELL_WIDTH);
+    }
+  });
+
+  test('legend line contains the literal Less and More', () => {
+    const grid = makeGrid();
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    const legend = lines[lines.length - 1];
+    assert.ok(legend.includes('Less'));
+    assert.ok(legend.includes('More'));
+  });
+
+  test('month-label line places a month abbreviation and never places two labels within 3 columns of each other', () => {
+    const grid = makeGrid(new Map(), 20);
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    const monthLine = lines[0];
+    const positions = [];
+    for (let i = heatmap.LABEL_WIDTH; i < monthLine.length; i++) {
+      if (/[A-Z]/.test(monthLine[i]) && (i === 0 || monthLine[i - 1] === ' ')) {
+        positions.push(i);
+      }
+    }
+    assert.ok(positions.length >= 1, 'expected at least one month label');
+    for (let i = 1; i < positions.length; i++) {
+      const colDelta = (positions[i] - positions[i - 1]) / heatmap.CELL_WIDTH;
+      assert.ok(colDelta > 3, `labels too close: ${positions[i - 1]} vs ${positions[i]}`);
+    }
+  });
+
+  test('a grid whose slots are all zero count renders without throwing and, with useColor: false, contains only spaces in its cell region', () => {
+    const grid = makeGrid(new Map());
+    const lines = heatmap.renderGrid(grid, { maxCount: 0, useColor: false });
+    const weekdayRows = lines.slice(1, 8);
+    for (const row of weekdayRows) {
+      const cellRegion = row.slice(heatmap.LABEL_WIDTH);
+      assert.ok(/^ *$/.test(cellRegion), `expected only spaces, got: ${JSON.stringify(cellRegion)}`);
+    }
+  });
+});
+
+describe('renderSummary', () => {
+  test('returns lines containing all eight labels with values from computeSummaryStats', () => {
+    const stats = heatmap.computeSummaryStats(new Map([['2026-09-01', 2], ['2026-09-02', 5]]));
+    const lines = heatmap.renderSummary(stats);
+    const joined = lines.join('\n');
+    for (const label of [
+      'Total turns', 'Active days', 'Busiest day', 'First turn', 'Last turn',
+      'Longest streak', 'Current streak', 'Avg per active day',
+    ]) {
+      assert.ok(joined.includes(label), `missing label: ${label}`);
+    }
+    assert.ok(joined.includes('7')); // total turns
+    assert.ok(joined.includes('2026-09-02')); // busiest day
+  });
+
+  test('D-04: output contains none of token, cost, model or $', () => {
+    const stats = heatmap.computeSummaryStats(new Map([['2026-09-01', 2], ['2026-09-02', 5]]));
+    const joined = heatmap.renderSummary(stats).join('\n');
+    assert.doesNotMatch(joined, /token|cost|model|\$/i);
+  });
+
+  test('empty-stats object (activeDays 0) renders without null or NaN appearing anywhere', () => {
+    const stats = heatmap.computeSummaryStats(new Map());
+    const joined = heatmap.renderSummary(stats).join('\n');
+    assert.doesNotMatch(joined, /null|NaN/);
+    assert.ok(joined.includes('—')); // dash placeholder for missing day keys
+  });
+});
+
+describe('heatmap command (integration)', () => {
+  let repoDir;
+  let origCwd;
+  let git;
+
+  beforeEach(() => {
+    origCwd = process.cwd();
+    const repo = makeTestRepo();
+    repoDir = repo.dir;
+    git = repo.git;
+    process.chdir(repoDir);
+    ensureDirs();
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    closeDb();
+    rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  function captureRun(args) {
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...a) => logs.push(a.join(' '));
+    try {
+      require('./heatmap').run(args);
+    } finally {
+      console.log = origLog;
+    }
+    return logs.join('\n');
+  }
+
+  function isoLocal(y, m0, d) {
+    return new Date(y, m0, d, 12, 0).toISOString();
+  }
+
+  test('zero-turn repo prints a "No turns" message and does not throw', () => {
+    const output = captureRun([]);
+    assert.match(output, /No turns/);
+  });
+
+  test('D-02: counts turns from two distinct sessions across three distinct local calendar days', () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m0 = now.getMonth();
+    const d = now.getDate();
+
+    const sessionA = startSession();
+    makeTurn(sessionA, 'a1', git, { ts: isoLocal(y, m0, d) });
+    makeTurn(sessionA, 'a2', git, { ts: isoLocal(y, m0, d) });
+
+    const sessionB = startSession();
+    makeTurn(sessionB, 'b1', git, { file: 'b.txt', ts: isoLocal(y, m0, d - 1) });
+    makeTurn(sessionB, 'b2', git, { file: 'b.txt', ts: isoLocal(y, m0, d - 2) });
+
+    const output = captureRun(['--no-cache']);
+    assert.match(output, /Total turns: 4/);
+    assert.match(output, /Active days: 3/);
+  });
+
+  test('NO_COLOR=1 suppresses all ANSI including in the summary block (Pitfall 3 bleed check)', () => {
+    const session = startSession();
+    makeTurn(session, 'x', git);
+
+    const origNoColor = process.env.NO_COLOR;
+    process.env.NO_COLOR = '1';
+    let output;
+    try {
+      output = captureRun(['--no-cache']);
+    } finally {
+      if (origNoColor === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = origNoColor;
+    }
+    assert.doesNotMatch(output, /\x1b/);
+  });
+
+  test('FORCE_COLOR=1 emits at least one 48;5; sequence', () => {
+    const session = startSession();
+    makeTurn(session, 'x', git);
+
+    const origForceColor = process.env.FORCE_COLOR;
+    process.env.FORCE_COLOR = '1';
+    let output;
+    try {
+      output = captureRun(['--no-cache']);
+    } finally {
+      if (origForceColor === undefined) delete process.env.FORCE_COLOR;
+      else process.env.FORCE_COLOR = origForceColor;
+    }
+    assert.match(output, /\x1b\[48;5;/);
+  });
+
+  test('D-03: discloses turns older than the rendered window via an "earlier" line', () => {
+    const session = startSession();
+    const now = new Date();
+    const y = now.getFullYear();
+    const m0 = now.getMonth();
+    const d = now.getDate();
+    // Force an artificially narrow window by writing turns far in the past
+    // relative to MAX_WEEKS (53 weeks = 371 days), then rendering with a
+    // 1-week window via a narrow terminal column count.
+    makeTurn(session, 'old', git, { ts: isoLocal(y, m0, d - 400) });
+    makeTurn(session, 'recent', git, { file: 'recent.txt', ts: isoLocal(y, m0, d) });
+
+    const origColumns = process.stdout.columns;
+    process.stdout.columns = 10; // availableWeeks(10) = floor((10-4)/2) = 3 weeks
+    let output;
+    try {
+      output = captureRun(['--no-cache']);
+    } finally {
+      process.stdout.columns = origColumns;
+    }
+    assert.match(output, /earlier/);
   });
 });
