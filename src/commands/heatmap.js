@@ -116,9 +116,72 @@ function computeSummaryStats(dayMap) {
   };
 }
 
+const LABEL_WIDTH = 4; // day-of-week label column
+const CELL_WIDTH = 2; // each grid cell renders as two characters
+const MAX_WEEKS = 53; // hard cap — a repo with years of turns never produces an unbounded grid
+
+// Returns how many week columns fit in a terminal `columns` wide, clamped to
+// [1, MAX_WEEKS]. `columns` is `process.stdout.columns`, which is undefined
+// for non-TTY (piped/redirected) output — that case gets the full window
+// since piped output has no "wrap" problem to avoid.
+function availableWeeks(columns) {
+  if (!columns) return MAX_WEEKS;
+  return Math.max(1, Math.min(MAX_WEEKS, Math.floor((columns - LABEL_WIDTH) / CELL_WIDTH)));
+}
+
+// Builds the bounded week-column grid model for the calendar heatmap.
+//
+// "All-time" (D-03) means no `--since`/range CLI flag was needed to produce
+// this data — it does NOT mean an unbounded grid. The window always ends on
+// `endDate` (today, from the caller) and spans at most `weeks` columns
+// (itself capped at MAX_WEEKS and further narrowed by availableWeeks() to
+// fit the terminal). Turns older than the window are simply not part of
+// `dayMap`'s render — Plan 02's `run()` is responsible for telling the user
+// when older turns fell outside the window (03.1-RESEARCH.md Open
+// Question 1).
+//
+// `dayMap` is keyed by dayKey()'s 'YYYY-MM-DD' format so lookups here always
+// match what groupByCalendarDay() produced.
+function buildWeekColumns(dayMap, { endDate, weeks }) {
+  const [ey, em, ed] = endDate.split('-').map(Number);
+  const end = new Date(ey, em - 1, ed);
+
+  // Find the Sunday of endDate's week, then step back (weeks - 1) weeks to
+  // get the window's first Sunday.
+  const endSunday = addDaysToLocalDate(ey, em - 1, ed, -end.getDay());
+  const firstSunday = new Date(
+    endSunday.getFullYear(),
+    endSunday.getMonth(),
+    endSunday.getDate() - (weeks - 1) * 7
+  );
+
+  const columns = [];
+  let cursor = firstSunday;
+  for (let w = 0; w < weeks; w++) {
+    const column = [];
+    for (let day = 0; day < 7; day++) {
+      if (cursor.getTime() > end.getTime()) {
+        column.push({ date: null, count: 0 });
+      } else {
+        const localKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+        column.push({ date: localKey, count: dayMap.get(localKey) || 0 });
+      }
+      cursor = addDaysToLocalDate(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 1);
+    }
+    columns.push(column);
+  }
+
+  return columns;
+}
+
 module.exports = {
   dayKey,
   groupByCalendarDay,
   bucketFor,
   computeSummaryStats,
+  availableWeeks,
+  buildWeekColumns,
+  LABEL_WIDTH,
+  CELL_WIDTH,
+  MAX_WEEKS,
 };
