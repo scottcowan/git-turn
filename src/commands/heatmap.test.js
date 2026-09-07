@@ -1,8 +1,13 @@
 'use strict';
 
-const { describe, test } = require('node:test');
+const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const { rmSync } = require('fs');
 const heatmap = require('./heatmap');
+const { makeTestRepo } = require('../helpers/test-repo');
+const { ensureDirs } = require('../session');
+const { startSession, makeTurn } = require('../helpers/turn-fixtures');
+const { closeDb } = require('../cache');
 
 // Anchors every fixture timestamp to a LOCAL wall-clock time so assertions
 // stay TZ-independent (never hardcode a UTC-derived string — see
@@ -342,5 +347,150 @@ describe('renderGrid', () => {
       const cellRegion = row.slice(heatmap.LABEL_WIDTH);
       assert.ok(/^ *$/.test(cellRegion), `expected only spaces, got: ${JSON.stringify(cellRegion)}`);
     }
+  });
+});
+
+describe('renderSummary', () => {
+  test('returns lines containing all eight labels with values from computeSummaryStats', () => {
+    const stats = heatmap.computeSummaryStats(new Map([['2026-09-01', 2], ['2026-09-02', 5]]));
+    const lines = heatmap.renderSummary(stats);
+    const joined = lines.join('\n');
+    for (const label of [
+      'Total turns', 'Active days', 'Busiest day', 'First turn', 'Last turn',
+      'Longest streak', 'Current streak', 'Avg per active day',
+    ]) {
+      assert.ok(joined.includes(label), `missing label: ${label}`);
+    }
+    assert.ok(joined.includes('7')); // total turns
+    assert.ok(joined.includes('2026-09-02')); // busiest day
+  });
+
+  test('D-04: output contains none of token, cost, model or $', () => {
+    const stats = heatmap.computeSummaryStats(new Map([['2026-09-01', 2], ['2026-09-02', 5]]));
+    const joined = heatmap.renderSummary(stats).join('\n');
+    assert.doesNotMatch(joined, /token|cost|model|\$/i);
+  });
+
+  test('empty-stats object (activeDays 0) renders without null or NaN appearing anywhere', () => {
+    const stats = heatmap.computeSummaryStats(new Map());
+    const joined = heatmap.renderSummary(stats).join('\n');
+    assert.doesNotMatch(joined, /null|NaN/);
+    assert.ok(joined.includes('—')); // dash placeholder for missing day keys
+  });
+});
+
+describe('heatmap command (integration)', () => {
+  let repoDir;
+  let origCwd;
+  let git;
+
+  beforeEach(() => {
+    origCwd = process.cwd();
+    const repo = makeTestRepo();
+    repoDir = repo.dir;
+    git = repo.git;
+    process.chdir(repoDir);
+    ensureDirs();
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    closeDb();
+    rmSync(repoDir, { recursive: true, force: true });
+  });
+
+  function captureRun(args) {
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...a) => logs.push(a.join(' '));
+    try {
+      require('./heatmap').run(args);
+    } finally {
+      console.log = origLog;
+    }
+    return logs.join('\n');
+  }
+
+  function isoLocal(y, m0, d) {
+    return new Date(y, m0, d, 12, 0).toISOString();
+  }
+
+  test('zero-turn repo prints a "No turns" message and does not throw', () => {
+    const output = captureRun([]);
+    assert.match(output, /No turns/);
+  });
+
+  test('D-02: counts turns from two distinct sessions across three distinct local calendar days', () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m0 = now.getMonth();
+    const d = now.getDate();
+
+    const sessionA = startSession();
+    makeTurn(sessionA, 'a1', git, { ts: isoLocal(y, m0, d) });
+    makeTurn(sessionA, 'a2', git, { ts: isoLocal(y, m0, d) });
+
+    const sessionB = startSession();
+    makeTurn(sessionB, 'b1', git, { file: 'b.txt', ts: isoLocal(y, m0, d - 1) });
+    makeTurn(sessionB, 'b2', git, { file: 'b.txt', ts: isoLocal(y, m0, d - 2) });
+
+    const output = captureRun(['--no-cache']);
+    assert.match(output, /Total turns: 4/);
+    assert.match(output, /Active days: 3/);
+  });
+
+  test('NO_COLOR=1 suppresses all ANSI including in the summary block (Pitfall 3 bleed check)', () => {
+    const session = startSession();
+    makeTurn(session, 'x', git);
+
+    const origNoColor = process.env.NO_COLOR;
+    process.env.NO_COLOR = '1';
+    let output;
+    try {
+      output = captureRun(['--no-cache']);
+    } finally {
+      if (origNoColor === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = origNoColor;
+    }
+    assert.doesNotMatch(output, /\x1b/);
+  });
+
+  test('FORCE_COLOR=1 emits at least one 48;5; sequence', () => {
+    const session = startSession();
+    makeTurn(session, 'x', git);
+
+    const origForceColor = process.env.FORCE_COLOR;
+    process.env.FORCE_COLOR = '1';
+    let output;
+    try {
+      output = captureRun(['--no-cache']);
+    } finally {
+      if (origForceColor === undefined) delete process.env.FORCE_COLOR;
+      else process.env.FORCE_COLOR = origForceColor;
+    }
+    assert.match(output, /\x1b\[48;5;/);
+  });
+
+  test('D-03: discloses turns older than the rendered window via an "earlier" line', () => {
+    const session = startSession();
+    const now = new Date();
+    const y = now.getFullYear();
+    const m0 = now.getMonth();
+    const d = now.getDate();
+    // Force an artificially narrow window by writing turns far in the past
+    // relative to MAX_WEEKS (53 weeks = 371 days), then rendering with a
+    // 1-week window via a narrow terminal column count.
+    makeTurn(session, 'old', git, { ts: isoLocal(y, m0, d - 400) });
+    makeTurn(session, 'recent', git, { file: 'recent.txt', ts: isoLocal(y, m0, d) });
+
+    const origColumns = process.stdout.columns;
+    process.stdout.columns = 10; // availableWeeks(10) = floor((10-4)/2) = 3 weeks
+    let output;
+    try {
+      output = captureRun(['--no-cache']);
+    } finally {
+      process.stdout.columns = origColumns;
+    }
+    assert.match(output, /earlier/);
   });
 });

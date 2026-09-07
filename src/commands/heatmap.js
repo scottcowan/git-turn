@@ -1,5 +1,8 @@
 'use strict';
 
+const { shouldColor } = require('../git');
+const blameUtil = require('../blame-util');
+
 // Pure, git-free core of `git turn heatmap`. Day bucketing deliberately uses
 // LOCAL date components, never UTC (03.1-RESEARCH.md Pitfall 1 — slicing the
 // UTC prefix of an ISO timestamp assigns turns to the wrong day for anyone
@@ -278,6 +281,70 @@ function renderGrid(grid, { maxCount, useColor }) {
   return lines;
 }
 
+// Renders the activity-only summary block (D-04) — totals, active days,
+// busiest/first/last day, streaks and average, with no token/cost/model
+// fields anywhere. Null day keys render as '—' rather than 'null'/'NaN'.
+function renderSummary(stats) {
+  const dayOrDash = value => value || '—';
+  return [
+    '',
+    `Total turns: ${stats.totalTurns}`,
+    `Active days: ${stats.activeDays}`,
+    `Busiest day: ${dayOrDash(stats.busiestDay)}`,
+    `First turn: ${dayOrDash(stats.firstDay)}`,
+    `Last turn: ${dayOrDash(stats.lastDay)}`,
+    `Longest streak: ${stats.longestStreak}`,
+    `Current streak: ${stats.currentStreak}`,
+    `Avg per active day: ${stats.avgPerActiveDay.toFixed(1)}`,
+  ];
+}
+
+// `git turn heatmap` entry point. Enumerates turns cross-session
+// (D-02, cache-first via listAllTurns), builds the bounded week-column grid
+// (D-03), renders it plus the activity-only summary block (D-04), and
+// discloses any turns that fall outside the rendered window rather than
+// silently hiding them.
+function run(args) {
+  const noCache = args.includes('--no-cache');
+  const turns = blameUtil.listAllTurns({ noCache });
+
+  if (turns.length === 0) {
+    console.log('No turns recorded yet — run some turns first, or check `git turn status`.');
+    return;
+  }
+
+  const dayMap = groupByCalendarDay(turns);
+  const endDate = dayKey(new Date().toISOString());
+  const weeks = availableWeeks(process.stdout.columns);
+  const grid = buildWeekColumns(dayMap, { endDate, weeks });
+  const maxCount = Math.max(...dayMap.values());
+  const useColor = shouldColor();
+
+  for (const line of renderGrid(grid, { maxCount, useColor })) {
+    console.log(line);
+  }
+
+  // Disclose turns older than the rendered window rather than silently
+  // hiding them (D-03 honesty about the bounded window).
+  const firstRenderedDate = grid
+    .flat()
+    .map(slot => slot.date)
+    .find(date => date !== null);
+  if (firstRenderedDate) {
+    let earlierCount = 0;
+    for (const [key, count] of dayMap) {
+      if (key < firstRenderedDate) earlierCount += count;
+    }
+    if (earlierCount > 0) {
+      console.log(`(${earlierCount} earlier turns outside the ${weeks}-week window)`);
+    }
+  }
+
+  for (const line of renderSummary(computeSummaryStats(dayMap))) {
+    console.log(line);
+  }
+}
+
 module.exports = {
   dayKey,
   groupByCalendarDay,
@@ -291,4 +358,6 @@ module.exports = {
   densityGlyph,
   densityAnsi,
   renderGrid,
+  renderSummary,
+  run,
 };
