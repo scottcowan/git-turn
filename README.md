@@ -38,6 +38,7 @@ git turn diff <N> <M>            Diff any two turns
 git turn show <N>                Full diff for turn N
 git turn blame <file>            Which turn last touched each line
 git turn bisect <cmd>            Binary-search turns for the one that broke <cmd>
+git turn heatmap                 Calendar heatmap of turn activity across all sessions
 git turn revert <N>              Restore worktree to turn N state
 git turn redo                    Undo the last revert
 git turn gc [--keep-sessions N]  Prune old session refs (default: keep 10)
