@@ -174,6 +174,110 @@ function buildWeekColumns(dayMap, { endDate, weeks }) {
   return columns;
 }
 
+const DENSITY_GLYPHS = [' ', '.', ':', '+', '#'];
+const DENSITY_ANSI = [236, 22, 28, 34, 40];
+
+// Maps a density level to an ASCII glyph for no-color degradation. Levels
+// outside 0..4 clamp rather than throw (defensive — bucketFor() never
+// produces an out-of-range level in practice).
+function densityGlyph(level) {
+  const idx = Math.max(0, Math.min(DENSITY_GLYPHS.length - 1, level));
+  return DENSITY_GLYPHS[idx];
+}
+
+// Maps a density level to a 256-color ANSI background palette index
+// (dim-gray zero state plus a 4-step green ramp). 256-color mode per
+// Assumption A1 — never truecolor (`48;2;`).
+function densityAnsi(level) {
+  const idx = Math.max(0, Math.min(DENSITY_ANSI.length - 1, level));
+  return DENSITY_ANSI[idx];
+}
+
+const MONTH_ABBREVS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Renders a single grid cell for an explicit density level (0..4). Colored
+// cells carry their OWN open/reset pair (never a single trailing reset per
+// line — 03.1-RESEARCH.md Pitfall 3).
+function cellForLevel(level, useColor) {
+  if (useColor) {
+    return `\x1b[48;5;${densityAnsi(level)}m  \x1b[0m`;
+  }
+  return densityGlyph(level) + ' ';
+}
+
+// Renders a single grid cell from a raw count, deriving its density level
+// relative to the caller's own maxCount (per D-01 / bucketFor).
+function cell(count, maxCount, useColor) {
+  return cellForLevel(bucketFor(count, maxCount), useColor);
+}
+
+// Returns the 4-character day-of-week label prefix for a grid row index
+// (0=Sunday..6=Saturday, matching Date#getDay()). Only Mon/Wed/Fri carry
+// text, matching the reference screenshot convention; other rows are blank.
+function weekdayLabel(rowIndex) {
+  if (rowIndex === 1) return 'Mon ';
+  if (rowIndex === 3) return 'Wed ';
+  if (rowIndex === 5) return 'Fri ';
+  return '    ';
+}
+
+// Builds the month-label header line by walking columns left to right,
+// placing a 3-letter abbreviation at the column offset of the first column
+// whose non-null dates include the 1st..7th of a month not yet labeled.
+// Skips a label whose position would land within 3 columns of the
+// previously placed label, avoiding overlapping text.
+function renderMonthLabels(grid) {
+  let line = ' '.repeat(LABEL_WIDTH);
+  let lastLabelCol = -Infinity;
+  let lastLabeledMonth = null;
+
+  for (let col = 0; col < grid.length; col++) {
+    const column = grid[col];
+    for (const slot of column) {
+      if (!slot.date) continue;
+      const [, mStr, dStr] = slot.date.split('-');
+      const monthIdx = parseInt(mStr, 10) - 1;
+      const dayOfMonth = parseInt(dStr, 10);
+      if (dayOfMonth >= 1 && dayOfMonth <= 7 && monthIdx !== lastLabeledMonth) {
+        if (col - lastLabelCol > 3) {
+          const targetLen = LABEL_WIDTH + col * CELL_WIDTH;
+          line = line.padEnd(targetLen, ' ') + MONTH_ABBREVS[monthIdx];
+          lastLabelCol = col;
+        }
+        lastLabeledMonth = monthIdx;
+      }
+      break; // one date-check per column is enough to detect month transitions
+    }
+  }
+
+  return line;
+}
+
+// Assembles the full rendered grid: one month-label line, 7 weekday rows,
+// and a legend line. Returns a string[] of exactly 9 lines regardless of
+// grid width.
+function renderGrid(grid, { maxCount, useColor }) {
+  const lines = [renderMonthLabels(grid)];
+
+  for (let row = 0; row < 7; row++) {
+    let line = weekdayLabel(row);
+    for (let col = 0; col < grid.length; col++) {
+      const slot = grid[col][row];
+      line += cell(slot.count, maxCount, useColor);
+    }
+    lines.push(line);
+  }
+
+  let legend = 'Less ';
+  for (let level = 0; level <= 4; level++) {
+    legend += cellForLevel(level, useColor);
+  }
+  legend += ' More';
+  lines.push(legend);
+
+  return lines;
+}
+
 module.exports = {
   dayKey,
   groupByCalendarDay,
@@ -184,4 +288,7 @@ module.exports = {
   LABEL_WIDTH,
   CELL_WIDTH,
   MAX_WEEKS,
+  densityGlyph,
+  densityAnsi,
+  renderGrid,
 };

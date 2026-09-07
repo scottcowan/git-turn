@@ -228,3 +228,119 @@ describe('buildWeekColumns', () => {
     }
   });
 });
+
+describe('densityGlyph / densityAnsi', () => {
+  test('densityGlyph maps levels 0..4 to the expected ASCII glyphs', () => {
+    assert.equal(heatmap.densityGlyph(0), ' ');
+    assert.equal(heatmap.densityGlyph(1), '.');
+    assert.equal(heatmap.densityGlyph(2), ':');
+    assert.equal(heatmap.densityGlyph(3), '+');
+    assert.equal(heatmap.densityGlyph(4), '#');
+  });
+
+  test('densityGlyph does not throw on an out-of-range level', () => {
+    assert.doesNotThrow(() => heatmap.densityGlyph(-1));
+    assert.doesNotThrow(() => heatmap.densityGlyph(99));
+  });
+
+  test('densityAnsi maps levels 0..4 to the expected 256-color palette indices', () => {
+    assert.equal(heatmap.densityAnsi(0), 236);
+    assert.equal(heatmap.densityAnsi(1), 22);
+    assert.equal(heatmap.densityAnsi(2), 28);
+    assert.equal(heatmap.densityAnsi(3), 34);
+    assert.equal(heatmap.densityAnsi(4), 40);
+  });
+
+  test('densityAnsi does not throw on an out-of-range level', () => {
+    assert.doesNotThrow(() => heatmap.densityAnsi(-1));
+    assert.doesNotThrow(() => heatmap.densityAnsi(99));
+  });
+});
+
+describe('renderGrid', () => {
+  function makeGrid(dayMap = new Map(), weeks = 5) {
+    return heatmap.buildWeekColumns(dayMap, { endDate: '2026-09-07', weeks });
+  }
+
+  test('returns exactly 9 lines: 1 month-label line + 7 weekday rows + 1 legend line', () => {
+    const grid = makeGrid();
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    assert.equal(lines.length, 9);
+  });
+
+  test('useColor: false emits no \\x1b anywhere (D-01 no-color degradation)', () => {
+    const grid = makeGrid(new Map([['2026-09-07', 4]]));
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    assert.ok(!lines.some(line => /\x1b/.test(line)));
+  });
+
+  test('useColor: true emits at least one 48;5; sequence with balanced open/reset counts per line (Pitfall 3)', () => {
+    const grid = makeGrid(new Map([['2026-09-07', 4]]));
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: true });
+    assert.ok(lines.some(line => /\x1b\[48;5;/.test(line)));
+    for (const line of lines) {
+      const opens = (line.match(/\x1b\[48;5;/g) || []).length;
+      const resets = (line.match(/\x1b\[0m/g) || []).length;
+      assert.equal(opens, resets, `unbalanced ANSI in line: ${JSON.stringify(line)}`);
+    }
+  });
+
+  test('each of the 7 weekday rows starts with a 4-character label prefix; Mon/Wed/Fri carry the abbreviation, others are blank', () => {
+    const grid = makeGrid();
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    const weekdayRows = lines.slice(1, 8);
+    assert.equal(weekdayRows.length, 7);
+    assert.equal(weekdayRows[0].slice(0, 4), '    ');
+    assert.equal(weekdayRows[1].slice(0, 4), 'Mon ');
+    assert.equal(weekdayRows[2].slice(0, 4), '    ');
+    assert.equal(weekdayRows[3].slice(0, 4), 'Wed ');
+    assert.equal(weekdayRows[4].slice(0, 4), '    ');
+    assert.equal(weekdayRows[5].slice(0, 4), 'Fri ');
+    assert.equal(weekdayRows[6].slice(0, 4), '    ');
+  });
+
+  test('each weekday row cell region is grid.length * CELL_WIDTH characters wide when useColor is false', () => {
+    const weeks = 5;
+    const grid = makeGrid(new Map(), weeks);
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    const weekdayRows = lines.slice(1, 8);
+    for (const row of weekdayRows) {
+      assert.equal(row.length - heatmap.LABEL_WIDTH, weeks * heatmap.CELL_WIDTH);
+    }
+  });
+
+  test('legend line contains the literal Less and More', () => {
+    const grid = makeGrid();
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    const legend = lines[lines.length - 1];
+    assert.ok(legend.includes('Less'));
+    assert.ok(legend.includes('More'));
+  });
+
+  test('month-label line places a month abbreviation and never places two labels within 3 columns of each other', () => {
+    const grid = makeGrid(new Map(), 20);
+    const lines = heatmap.renderGrid(grid, { maxCount: 4, useColor: false });
+    const monthLine = lines[0];
+    const positions = [];
+    for (let i = heatmap.LABEL_WIDTH; i < monthLine.length; i++) {
+      if (/[A-Z]/.test(monthLine[i]) && (i === 0 || monthLine[i - 1] === ' ')) {
+        positions.push(i);
+      }
+    }
+    assert.ok(positions.length >= 1, 'expected at least one month label');
+    for (let i = 1; i < positions.length; i++) {
+      const colDelta = (positions[i] - positions[i - 1]) / heatmap.CELL_WIDTH;
+      assert.ok(colDelta > 3, `labels too close: ${positions[i - 1]} vs ${positions[i]}`);
+    }
+  });
+
+  test('a grid whose slots are all zero count renders without throwing and, with useColor: false, contains only spaces in its cell region', () => {
+    const grid = makeGrid(new Map());
+    const lines = heatmap.renderGrid(grid, { maxCount: 0, useColor: false });
+    const weekdayRows = lines.slice(1, 8);
+    for (const row of weekdayRows) {
+      const cellRegion = row.slice(heatmap.LABEL_WIDTH);
+      assert.ok(/^ *$/.test(cellRegion), `expected only spaces, got: ${JSON.stringify(cellRegion)}`);
+    }
+  });
+});
