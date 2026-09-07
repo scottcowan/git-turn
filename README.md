@@ -41,6 +41,7 @@ git turn bisect <cmd>            Binary-search turns for the one that broke <cmd
 git turn revert <N>              Restore worktree to turn N state
 git turn redo                    Undo the last revert
 git turn gc [--keep-sessions N]  Prune old session refs (default: keep 10)
+git turn cost [--all]            Token usage and estimated cost for the current (or all) sessions
 git turn session new [--from <session_id>:<turn_n>]  Start a session, optionally forked from a specific turn
 git turn session list            List every session, with turn counts and fork lineage
 git turn export [--since <ref>] [--output <path>]    Bundle git-turn refs for handoff to another repo
@@ -124,6 +125,7 @@ Everything lives in your git repo. No server, no external service.
 
 - `refs/git-turn/sessions/{id}/turn-{N}` — snapshot refs
 - `refs/git-turn/sessions/{id}/meta` — durable per-session metadata (fork lineage), survives after the session is no longer active
+- `refs/notes/git-turn` — per-commit metadata (`{session_id, turn_n, snapshot_sha, ts}`)
 - `.git/git-turn/ops/` — operation log for revert/redo
 - `refs/git-turn/format` — discovery blob for tooling
 

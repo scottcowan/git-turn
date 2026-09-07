@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v0.1 Working CLI** — Phase 1 (shipped 2026-08-09)
-- 📋 **v0.2 Read Cache + Blame/Bisect** — Phases 2-3 (planned)
+- 🔄 **v0.2 Read Cache + Blame/Bisect** — Phase 2 complete (2026-08-18), Phase 3 in progress (3/4 plans, wave 3 checkpoint outstanding)
 - 📋 **v0.3 Prompt Capture + MCP** — Phases 4-5 (planned)
 - 📋 **v1.0 Warren Integration** — Phase 6 (planned)
 
@@ -96,3 +96,5 @@ Plans:
 | 4. Prompt capture | v0.3 | 0/? | Planned | — |
 | 5. MCP server | v0.3 | 0/? | Planned | — |
 | 6. Warren integration | v1.0 | 0/? | Planned | — |
+
+Also shipped ad hoc, untracked by any phase (same pattern as Phase 2's SQLite cache): `session new`/`session list` (fork lineage) and `export` (cross-repo ref bundle) — commit `7b446ce`, 2026-09-06.

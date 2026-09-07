@@ -1,13 +1,13 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.1
-milestone_name: Working CLI
+milestone: v0.2
+milestone_name: Read Cache + Blame/Bisect
 status: executing
-last_updated: "2026-09-02T16:06:24.063Z"
-last_activity: 2026-09-02
+last_updated: "2026-09-07T00:27:47.000Z"
+last_activity: 2026-09-07
 progress:
-  total_phases: 2
-  completed_phases: 1
+  total_phases: 3
+  completed_phases: 2
   total_plans: 10
   completed_plans: 9
   percent: 90
@@ -19,8 +19,8 @@ progress:
 
 Phase: 3 (bisect-blame) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-09-02
+Status: Wave 3 checkpoint outstanding (03-04 task 2: real-terminal legibility check for blame/bisect) — docs task landed (a20ab56), checkpoint never resolved
+Last activity: 2026-09-07 — doc drift audit + fixes; session/export/bisect-perf work shipped ad hoc since Phase 3 execution
 
 ## Decisions
 
@@ -36,12 +36,9 @@ Last activity: 2026-09-02
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close on 2026-08-09:
-
-| Category | Item | Status |
-|----------|------|--------|
-| todo | sqlite-read-cache.md | deferred to v0.2 (phase-2 feature) |
+None currently — `sqlite-read-cache.md` (previously deferred here) shipped 2026-08-18 (`d591cff`) and was moved to `.planning/todos/completed/` on 2026-09-06.
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Resolve Phase 3's outstanding wave-3 checkpoint (03-04 task 2): run the real-terminal legibility check for `blame`/`bisect` output, then close out `03-04-SUMMARY.md` and `03-VERIFICATION.md` so Phase 3 can be marked Complete.
+- After Phase 3 closes: decide whether to formally roadmap `session`/`export` (shipped ad hoc) before starting the next milestone with `/gsd-new-milestone`.

@@ -61,7 +61,7 @@ Bundles just the git-turn ref namespace (`refs/git-turn/sessions/**`, `refs/note
 
 - `refs/git-turn/sessions/{id}/turn-{N}` — snapshot refs, one per turn
 - `refs/git-turn/sessions/{id}/meta` — durable per-session metadata blob (`{session_id, started, branch, forked_from}`); unlike `session.json`, this persists after the session is no longer active, so `session list` can always show fork lineage
-- `refs/notes/git-turn` — per-commit metadata (session id, cc_session, timestamp, usage); **overwritten in place** on each turn, not appended — prior values only survive in the notes-ref commit history (`git log refs/notes/git-turn`)
+- `refs/notes/git-turn` — per-commit metadata; shipped payload is `{session_id, turn_n, snapshot_sha, ts}` (`src/hooks/post-commit.js`). `prompt`/`model`/`latency_ms`/`usage` are read defensively where present (`cache.js`, `cost.js`) but nothing shipped writes them yet — that's Phase 4 (prompt capture), not built. **Overwritten in place** on each turn, not appended — prior values only survive in the notes-ref commit history (`git log refs/notes/git-turn`)
 - `refs/git-turn/format` — a discovery blob (JSON: version, tool, schema, ref_pattern, notes_ref) so other tooling can detect git-turn without guessing ref layout
 - `.git/git-turn/ops/` — revert/redo operation log
 - SQLite read cache (Node 22+, `node:sqlite`) mirrors refs/notes for fast `log`/`cost` reads; rebuilt via `gc --rebuild` or automatically if stale

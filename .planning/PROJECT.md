@@ -14,9 +14,10 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 - **Refs** — `refs/git-turn/sessions/{id}/turn-{N}` point at dangling snapshot commits
 - **Snapshots** — dangling `commit-tree` commits with two trees: index state + full worktree (including untracked)
-- **Notes** — `refs/notes/git-turn` stores prompt, model, latency per turn on the HEAD commit
+- **Notes** — `refs/notes/git-turn` stores `{session_id, turn_n, snapshot_sha, ts}` per turn on the HEAD commit. `prompt`/`model`/`latency_ms`/`usage` are read defensively where present but nothing shipped writes them yet (Phase 4, not built).
+- **Session meta** — `refs/git-turn/sessions/{id}/meta` durable per-session metadata (fork lineage via `session new --from`), survives after the session is no longer active
 - **Op log** — `.git/git-turn/ops/` content-addressed operation log (jj-style) for undo/redo
-- **SQLite cache** — (planned) read cache for fast `git turn log`, `blame`, `bisect` queries
+- **SQLite cache** — shipped (`src/cache.js`, `d591cff`) — read cache for fast `log`/`cost` reads, rebuilt via `gc --rebuild` or automatically if stale
 
 ## Key Decisions
 
@@ -29,17 +30,13 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 ## Current State
 
-**Shipped:** v0.1 — Working CLI (2026-08-09)
+**Shipped:** v0.1 (Working CLI, 2026-08-09) through v0.2 (SQLite cache + bisect/blame). `session`/`export` shipped ad hoc from todos, same pattern as the SQLite cache did.
 
-8 commands working end-to-end: `init`, `log`, `show`, `diff`, `revert`, `redo`, `status`, `gc`. Full test suite (23 tests). Hook installs via absolute path for cross-repo compatibility.
+13 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`. Full test suite (93 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
 
-**Known issues at v0.1:**
-- `git turn log` output label says "turn N session …" (snapshot commit message verbatim) — needs cleaner formatting in v0.2
-- No SQLite read cache yet — log/blame will be slow on large histories
+**Not yet implemented:** `branch --from <N>` (Phase 6, blocked on the Warren API).
 
-**Next milestone goals (v0.2):**
-- SQLite read cache for fast `log`, `blame`, `bisect`
-- `git turn bisect <cmd>` and `git turn blame <file>`
+**Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (`git turn heatmap` and secret redaction on notes are the current pending items).
 
 ## Prior art
 
@@ -48,4 +45,4 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 - Jujutsu — content-addressed op log, op restore via update-ref only
 
 ---
-*Last updated: 2026-08-09 after v0.1 milestone*
+*Last updated: 2026-09-07*
