@@ -8,6 +8,15 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
+// Whether diff output should carry ANSI color. Respects NO_COLOR (spec:
+// no-color.org) and FORCE_COLOR overrides before falling back to TTY
+// detection — piping to a file or another program gets plain text.
+function shouldColor() {
+  if (process.env.NO_COLOR) return false;
+  if (process.env.FORCE_COLOR) return true;
+  return Boolean(process.stdout.isTTY);
+}
+
 function git(args, opts = {}) {
   return execFileSync('git', args, {
     encoding: 'utf8',
@@ -176,7 +185,7 @@ function getNote(ref, commitSha) {
 }
 
 module.exports = {
-  git, gitSafe, repoRoot, gitDir, hooksDir, headSha, currentBranch,
+  git, gitSafe, repoRoot, gitDir, hooksDir, headSha, currentBranch, shouldColor,
   updateRef, deleteRef, listRefs,
   snapshotWorktree, restoreSnapshot,
   writeBlob, readBlob,

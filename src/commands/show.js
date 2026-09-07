@@ -1,6 +1,6 @@
 'use strict';
 
-const { git, gitSafe } = require('../git');
+const { git, gitSafe, shouldColor } = require('../git');
 const { readSession, listTurns, NOTES_REF } = require('../session');
 
 function run(args) {
@@ -31,13 +31,14 @@ function run(args) {
   console.log('');
 
   // Diff: worktree-tree of this turn vs previous turn
+  const colorArg = shouldColor() ? '--color=always' : '--color=never';
   if (prev) {
-    const diffOut = gitSafe(['diff', prev.sha, turn.sha]) || '(no changes)';
+    const diffOut = gitSafe(['diff', colorArg, prev.sha, turn.sha]) || '(no changes)';
     console.log(diffOut);
   } else {
     // First turn — diff against empty tree
     const emptyTree = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-    const diffOut = gitSafe(['diff', emptyTree, turn.sha]) || '(no changes)';
+    const diffOut = gitSafe(['diff', colorArg, emptyTree, turn.sha]) || '(no changes)';
     console.log(diffOut);
   }
 }

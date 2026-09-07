@@ -1,6 +1,6 @@
 'use strict';
 
-const { gitSafe } = require('../git');
+const { gitSafe, shouldColor } = require('../git');
 const { readSession, listTurns } = require('../session');
 
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -51,7 +51,8 @@ function run(args) {
     shaA = prevTurn ? prevTurn.sha : EMPTY_TREE;
   }
 
-  const out = gitSafe(['diff', shaA, shaB]) || '(no changes)';
+  const colorArg = shouldColor() ? '--color=always' : '--color=never';
+  const out = gitSafe(['diff', colorArg, shaA, shaB]) || '(no changes)';
   console.log(out);
 }
 

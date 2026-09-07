@@ -21,7 +21,7 @@ List turns in the current session: turn number, short SHA, commit subject, files
 Full diff for turn `N`, plus the captured prompt/session note if present. Use this to see exactly what one turn changed.
 
 ### `git turn diff <N> [M]`
-Diff turn `N-1` vs `N` if `M` omitted, otherwise diff turn `N` vs turn `M` directly.
+Diff turn `N-1` vs `N` if `M` omitted, otherwise diff turn `N` vs turn `M` directly. Both `diff` and `show` colorize output the same way `git diff` does — ANSI colored when stdout is a TTY, plain when piped. Override with `NO_COLOR=1` (forces plain) or `FORCE_COLOR=1` (forces color even when piped); `NO_COLOR` wins if both are set.
 
 ### `git turn blame <file> [--no-cache]`
 Per-line attribution: each line of `<file>` is labeled with the session (first 8 characters of the session id) and turn number that last touched it, e.g. `f17a78b9:3`. Unlike `log`/`show`/`diff`, attribution spans every session in the repo, not just the current one — a line from an earlier, unrelated session still resolves to that session's label. Lines from commits that are not git-turn turns render as `<sha7> (not a turn)`; uncommitted lines render as `(uncommitted)`; lines in untracked-only files that the snapshot-diff fallback cannot attribute render as `(unattributed)`. `--no-cache` bypasses the SQLite read cache and enumerates turns by walking `refs/git-turn/sessions/` directly.

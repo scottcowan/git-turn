@@ -102,4 +102,50 @@ describe('diff command', () => {
     // Output is a string (truthy diff patch or '(no changes)')
     assert.ok(typeof output === 'string');
   });
+
+  test('FORCE_COLOR emits ANSI-colored diff output', () => {
+    makeTurn('x');
+    makeTurn('y');
+
+    const origForceColor = process.env.FORCE_COLOR;
+    process.env.FORCE_COLOR = '1';
+
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+    try {
+      run(['1', '2']);
+    } finally {
+      console.log = origLog;
+      if (origForceColor === undefined) delete process.env.FORCE_COLOR;
+      else process.env.FORCE_COLOR = origForceColor;
+    }
+
+    const output = logs.join('\n');
+    assert.match(output, /\x1b\[/, 'FORCE_COLOR should produce ANSI escape codes in the diff');
+  });
+
+  test('NO_COLOR suppresses ANSI codes even when stdout would otherwise color', () => {
+    makeTurn('x');
+    makeTurn('y');
+
+    const origNoColor = process.env.NO_COLOR;
+    const origForceColor = process.env.FORCE_COLOR;
+    process.env.NO_COLOR = '1';
+    process.env.FORCE_COLOR = '1'; // NO_COLOR must win even if FORCE_COLOR is also set
+
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+    try {
+      run(['1', '2']);
+    } finally {
+      console.log = origLog;
+      if (origNoColor === undefined) delete process.env.NO_COLOR; else process.env.NO_COLOR = origNoColor;
+      if (origForceColor === undefined) delete process.env.FORCE_COLOR; else process.env.FORCE_COLOR = origForceColor;
+    }
+
+    const output = logs.join('\n');
+    assert.doesNotMatch(output, /\x1b\[/, 'NO_COLOR must suppress ANSI codes regardless of FORCE_COLOR');
+  });
 });
