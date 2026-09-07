@@ -98,3 +98,13 @@ Plans:
 | 6. Warren integration | v1.0 | 0/? | Planned | — |
 
 Also shipped ad hoc, untracked by any phase (same pattern as Phase 2's SQLite cache): `session new`/`session list` (fork lineage) and `export` (cross-repo ref bundle) — commit `7b446ce`, 2026-09-06.
+
+### Phase 03.1: Turn heatmap — calendar grid of turn activity by model/agent (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 3
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 03.1 to break down)

@@ -2,25 +2,24 @@
 gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: Read Cache + Blame/Bisect
-status: milestone_complete
-last_updated: 2026-09-07T00:37:56.278Z
+status: closing
+last_updated: "2026-09-07T12:30:00.000Z"
 last_activity: 2026-09-07
 progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 10
-  percent: 67
-stopped_at: Milestone complete (Phase 3 was final phase)
+  total_phases: 4
+  completed_phases: 3
+  total_plans: 14
+  completed_plans: 14
+  percent: 100
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 3
+Phase: 03.1 (turn-heatmap) — INSERTED, not yet planned
 Plan: Not started
-Status: Milestone complete
+Status: Milestone v0.2 phases (1, 2, 3) all complete; /gsd-complete-milestone paused at pre-flight gate pending audit + 2 open todos
 Last activity: 2026-09-07
 
 ## Decisions
@@ -41,5 +40,13 @@ None currently — `sqlite-read-cache.md` (previously deferred here) shipped 202
 
 ## Operator Next Steps
 
-- Resolve Phase 3's outstanding wave-3 checkpoint (03-04 task 2): run the real-terminal legibility check for `blame`/`bisect` output, then close out `03-04-SUMMARY.md` and `03-VERIFICATION.md` so Phase 3 can be marked Complete.
-- After Phase 3 closes: decide whether to formally roadmap `session`/`export` (shipped ad hoc) before starting the next milestone with `/gsd-new-milestone`.
+- Plan and execute Phase 03.1 (turn heatmap) — inserted, decisions pending via `/gsd-discuss-phase 03.1`.
+- Fold the secret-redaction requirement into Phase 4 (prompt capture) — recorded as a locked decision when Phase 4 is discussed/planned, not tracked as its own phase (see `.planning/todos/pending/2026-09-06-secret-redaction-on-notes.md`).
+- Run `/gsd-audit-milestone` for v0.2 (not yet run).
+- Once the above are done, re-run `/gsd-complete-milestone` to actually archive v0.2 (it was started and paused at the pre-flight gate on 2026-09-07 pending exactly these items).
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 03.1 inserted after Phase 3: Turn heatmap — calendar grid of turn activity by model/agent (URGENT)
