@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v0.1 Working CLI** — Phase 1 (shipped 2026-08-09)
-- 🔄 **v0.2 Read Cache + Blame/Bisect** — Phase 2 complete (2026-08-18), Phase 3 in progress (3/4 plans, wave 3 checkpoint outstanding)
+- ✅ **v0.2 Read Cache + Blame/Bisect** — Phase 2 (2026-08-18), Phase 3 (2026-09-07)
 - 📋 **v0.3 Prompt Capture + MCP** — Phases 4-5 (planned)
 - 📋 **v1.0 Warren Integration** — Phase 6 (planned)
 
@@ -29,7 +29,7 @@ Archive: `.planning/milestones/v0.1-ROADMAP.md`
 ### 📋 v0.2 Read Cache + Blame/Bisect (Phases 2-3)
 
 - [ ] **Phase 2: SQLite read cache** — fast log/blame/bisect without walking git objects; rebuild from notes on startup
-- [ ] **Phase 3: bisect + blame** — `git turn bisect <cmd>`, `git turn blame <file>`
+- [x] **Phase 3: bisect + blame** — `git turn bisect <cmd>`, `git turn blame <file>` (completed 2026-09-07)
 
 ### 📋 v0.3 Prompt Capture + MCP (Phases 4-5)
 
@@ -84,7 +84,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-04-PLAN.md — Docs: README.md + AGENTS.md + `--help`, replacing the "not yet implemented" notes; human verification of output legibility [wave 3]
+- [x] 03-04-PLAN.md — Docs: README.md + AGENTS.md + `--help`, replacing the "not yet implemented" notes; human verification of output legibility [wave 3]
 
 ## Progress
 
@@ -92,7 +92,7 @@ Plans:
 |-------|-----------|---------------|--------|-----------|
 | 1. Core commands | v0.1 | 6/6 | Complete | 2026-08-09 |
 | 2. SQLite read cache | v0.2 | shipped (ungoverned) | Complete | 2026-08-18 |
-| 3. bisect + blame | v0.2 | 3/4 | In Progress|  |
+| 3. bisect + blame | v0.2 | 4/4 | Complete   | 2026-09-07 |
 | 4. Prompt capture | v0.3 | 0/? | Planned | — |
 | 5. MCP server | v0.3 | 0/? | Planned | — |
 | 6. Warren integration | v1.0 | 0/? | Planned | — |
