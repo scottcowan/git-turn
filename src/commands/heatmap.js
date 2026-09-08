@@ -7,11 +7,15 @@ const blameUtil = require('../blame-util');
 // LOCAL date components, never UTC (03.1-RESEARCH.md Pitfall 1 — slicing the
 // UTC prefix of an ISO timestamp assigns turns to the wrong day for anyone
 // not in UTC). Density levels are deliberately data-relative — computed from
-// the caller's own max-per-day, never fixed absolute thresholds
+// the busiest day WITHIN THE RENDERED WINDOW (via gridMaxCount(grid)), never
+// fixed absolute thresholds and never the all-time dayMap
 // (03.1-RESEARCH.md Pitfall 2 / Assumption A2) — so a low-activity repo and
-// a high-activity repo both render the full 0..4 level range. A future
-// reader should not "fix" either of these into UTC slicing or fixed
-// thresholds; both are intentional.
+// a high-activity repo both render the full 0..4 level range for the days
+// actually on screen. Scaling against the all-time dayMap instead of the
+// rendered grid was the WR-01 defect closed by plan 03.1-04
+// (03.1-VERIFICATION.md) — a future reader should not "fix" this back to
+// all-time scoping, nor should the UTC-vs-local day bucketing be "fixed"
+// into UTC slicing or fixed thresholds; all of this is intentional.
 
 // Builds a 'YYYY-MM-DD' key from the LOCAL date components of `isoTs`.
 // Never uses getUTCFullYear/getUTCMonth/getUTCDate and never slices the raw
@@ -38,8 +42,11 @@ function groupByCalendarDay(turns) {
 
 // Maps a raw turn count to a data-relative density level 0..4, per D-01.
 // 0 only when count is 0 (or maxCount is non-positive, degenerate input);
-// any positive count is clamped to at least level 1, and the top of the
-// caller's own data range always reaches level 4 regardless of scale.
+// any positive count is clamped to at least level 1. Callers must pass a
+// window-scoped `maxCount` (the rendered grid's own max, e.g.
+// gridMaxCount(grid)) so the busiest VISIBLE day always reaches level 4
+// regardless of scale — bucketFor() itself stays a pure (count, maxCount)
+// function with no opinion on where maxCount comes from.
 function bucketFor(count, maxCount) {
   if (count <= 0 || maxCount <= 0) return 0;
   return Math.min(4, Math.max(1, Math.ceil((count / maxCount) * 4)));
