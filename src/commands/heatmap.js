@@ -177,6 +177,20 @@ function buildWeekColumns(dayMap, { endDate, weeks }) {
   return columns;
 }
 
+// Returns the highest `count` across every slot of every column in `grid`
+// (the RENDERED window, not the all-time `dayMap`). This denominator is
+// deliberately scoped to what the user actually sees on screen — scaling
+// against the unbounded `dayMap` was the WR-01 defect closed by plan
+// 03.1-04 (03.1-VERIFICATION.md): a busiest day outside the rendered window
+// would otherwise flatten every visible cell toward level 1. A future
+// reader should not "fix" this back to spreading the all-time dayMap values
+// into Math.max directly.
+// The leading `0` seed guarantees an empty or all-zero grid returns `0`
+// rather than `Math.max()`'s no-args `-Infinity`.
+function gridMaxCount(grid) {
+  return Math.max(0, ...grid.flat().map(slot => slot.count));
+}
+
 const DENSITY_GLYPHS = [' ', '.', ':', '+', '#'];
 const DENSITY_ANSI = [236, 22, 28, 34, 40];
 
@@ -317,7 +331,7 @@ function run(args) {
   const endDate = dayKey(new Date().toISOString());
   const weeks = availableWeeks(process.stdout.columns);
   const grid = buildWeekColumns(dayMap, { endDate, weeks });
-  const maxCount = Math.max(...dayMap.values());
+  const maxCount = gridMaxCount(grid);
   const useColor = shouldColor();
 
   for (const line of renderGrid(grid, { maxCount, useColor })) {
@@ -352,6 +366,7 @@ module.exports = {
   computeSummaryStats,
   availableWeeks,
   buildWeekColumns,
+  gridMaxCount,
   LABEL_WIDTH,
   CELL_WIDTH,
   MAX_WEEKS,

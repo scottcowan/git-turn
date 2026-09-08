@@ -234,6 +234,54 @@ describe('buildWeekColumns', () => {
   });
 });
 
+describe('gridMaxCount', () => {
+  test('returns the highest count across all slots of all columns', () => {
+    const grid = [
+      [{ date: '2026-09-01', count: 0 }, { date: '2026-09-02', count: 3 }],
+      [{ date: '2026-09-03', count: 1 }, { date: '2026-09-04', count: 3 }],
+    ];
+    assert.equal(heatmap.gridMaxCount(grid), 3);
+  });
+
+  test('a grid whose every slot is count: 0 returns 0, not -Infinity', () => {
+    const grid = [
+      [{ date: '2026-09-01', count: 0 }, { date: '2026-09-02', count: 0 }],
+    ];
+    assert.equal(heatmap.gridMaxCount(grid), 0);
+  });
+
+  test('an empty array returns 0', () => {
+    assert.equal(heatmap.gridMaxCount([]), 0);
+  });
+
+  test('a buildWeekColumns result over a dayMap with an out-of-window high day returns only the in-window max', () => {
+    const outOfWindowKey = expectedKey(2020, 0, 1);
+    const inWindowKey = expectedKey(2026, 8, 7);
+    const map = new Map([
+      [outOfWindowKey, 500],
+      [inWindowKey, 3],
+    ]);
+    const grid = heatmap.buildWeekColumns(map, { endDate: '2026-09-07', weeks: 4 });
+    assert.equal(heatmap.gridMaxCount(grid), 3);
+  });
+
+  test('D-01 (WR-01 regression): bucketFor composed with gridMaxCount reaches level 4 for the in-window busiest day, while composing with the all-time dayMap max does not', () => {
+    const outOfWindowKey = expectedKey(2020, 0, 1);
+    const inWindowKey = expectedKey(2026, 8, 7);
+    const dayMap = new Map([
+      [outOfWindowKey, 500],
+      [inWindowKey, 3],
+    ]);
+    const grid = heatmap.buildWeekColumns(dayMap, { endDate: '2026-09-07', weeks: 10 });
+
+    const windowedMax = heatmap.gridMaxCount(grid);
+    const allTimeMax = Math.max(...dayMap.values());
+
+    assert.equal(heatmap.bucketFor(3, windowedMax), 4);
+    assert.equal(heatmap.bucketFor(3, allTimeMax), 1);
+  });
+});
+
 describe('densityGlyph / densityAnsi', () => {
   test('densityGlyph maps levels 0..4 to the expected ASCII glyphs', () => {
     assert.equal(heatmap.densityGlyph(0), ' ');
@@ -492,5 +540,80 @@ describe('heatmap command (integration)', () => {
       process.stdout.columns = origColumns;
     }
     assert.match(output, /earlier/);
+  });
+
+  // Splits captured output into the 7 weekday rows only (excluding the
+  // legend line, which always contains all five glyphs regardless of
+  // maxCount scoping — asserting against it would make these tests
+  // vacuously pass).
+  function weekdayRowLines(output) {
+    return output
+      .split('\n')
+      .filter(line => /^(Mon |Wed |Fri |    )/.test(line) && !line.startsWith('Less '));
+  }
+
+  test('D-01 (WR-01 regression): an off-window activity burst does not flatten the in-window grid — in-window busiest day still reaches level 4', () => {
+    const session = startSession();
+    const now = new Date();
+    const y = now.getFullYear();
+    const m0 = now.getMonth();
+    const d = now.getDate();
+
+    // 6 turns definitively outside a 3-week window.
+    for (let i = 0; i < 6; i++) {
+      makeTurn(session, `old${i}`, git, { file: `old${i}.txt`, ts: isoLocal(y, m0, d - 400) });
+    }
+    // 3 turns today, 3 turns yesterday — both inside the window.
+    for (let i = 0; i < 3; i++) {
+      makeTurn(session, `today${i}`, git, { file: `today${i}.txt`, ts: isoLocal(y, m0, d) });
+    }
+    for (let i = 0; i < 3; i++) {
+      makeTurn(session, `yest${i}`, git, { file: `yest${i}.txt`, ts: isoLocal(y, m0, d - 1) });
+    }
+
+    const origNoColor = process.env.NO_COLOR;
+    const origColumns = process.stdout.columns;
+    process.env.NO_COLOR = '1';
+    process.stdout.columns = 10; // availableWeeks(10) = 3 weeks
+    let output;
+    try {
+      output = captureRun(['--no-cache']);
+    } finally {
+      if (origNoColor === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = origNoColor;
+      process.stdout.columns = origColumns;
+    }
+
+    assert.match(output, /earlier/);
+    const rows = weekdayRowLines(output);
+    assert.ok(rows.some(line => line.includes('#')), `expected a '#' cell in a weekday row, got: ${JSON.stringify(rows)}`);
+    assert.match(output, /Total turns: 12/);
+  });
+
+  test('D-01: the "normal" case is unchanged when the all-time busiest day is already inside the window', () => {
+    const session = startSession();
+    const now = new Date();
+    const y = now.getFullYear();
+    const m0 = now.getMonth();
+    const d = now.getDate();
+
+    for (let i = 0; i < 3; i++) {
+      makeTurn(session, `today${i}`, git, { file: `today${i}.txt`, ts: isoLocal(y, m0, d) });
+    }
+    makeTurn(session, 'yest', git, { file: 'yest.txt', ts: isoLocal(y, m0, d - 1) });
+
+    const origNoColor = process.env.NO_COLOR;
+    process.env.NO_COLOR = '1';
+    let output;
+    try {
+      output = captureRun(['--no-cache']);
+    } finally {
+      if (origNoColor === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = origNoColor;
+    }
+
+    assert.doesNotMatch(output, /earlier/);
+    const rows = weekdayRowLines(output);
+    assert.ok(rows.some(line => line.includes('#')), `expected a '#' cell in a weekday row, got: ${JSON.stringify(rows)}`);
   });
 });
