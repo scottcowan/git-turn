@@ -30,13 +30,13 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 ## Current State
 
-**Shipped:** v0.1 (Working CLI, 2026-08-09) through v0.2 (SQLite cache + bisect/blame). `session`/`export` shipped ad hoc from todos, same pattern as the SQLite cache did.
+**Shipped:** v0.1 (Working CLI, 2026-08-09) through v0.2 (SQLite cache + bisect/blame). `session`/`export` shipped ad hoc from todos, same pattern as the SQLite cache did. Phase 03.1 complete: `git turn heatmap` (calendar-grid ANSI heatmap of cross-session turn activity, colored by day-count density scoped to the rendered window, with an activity-only summary block).
 
-13 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`. Full test suite (93 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
+14 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`, `heatmap`. Full test suite (145 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
 
 **Not yet implemented:** `branch --from <N>` (Phase 6, blocked on the Warren API).
 
-**Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (`git turn heatmap` and secret redaction on notes are the current pending items).
+**Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (secret redaction on notes and the rich diff renderer are the current pending items).
 
 ## Prior art
 
@@ -45,4 +45,4 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 - Jujutsu — content-addressed op log, op restore via update-ref only
 
 ---
-*Last updated: 2026-09-07*
+*Last updated: 2026-09-08*
