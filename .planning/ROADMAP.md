@@ -93,7 +93,7 @@ Plans:
 | 1. Core commands | v0.1 | 6/6 | Complete | 2026-08-09 |
 | 2. SQLite read cache | v0.2 | shipped (ungoverned) | Complete | 2026-08-18 |
 | 3. bisect + blame | v0.2 | 4/4 | Complete    | 2026-09-07 |
-| 03.1. Turn heatmap | v0.2 | 4/4 | Complete   | 2026-09-08 |
+| 03.1. Turn heatmap | v0.2 | 4/4 | Complete    | 2026-09-08 |
 | 4. Prompt capture | v0.3 | 0/? | Planned | — |
 | 5. MCP server | v0.3 | 0/? | Planned | — |
 | 6. Warren integration | v1.0 | 0/? | Planned | — |
