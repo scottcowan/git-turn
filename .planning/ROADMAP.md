@@ -93,7 +93,7 @@ Plans:
 | 1. Core commands | v0.1 | 6/6 | Complete | 2026-08-09 |
 | 2. SQLite read cache | v0.2 | shipped (ungoverned) | Complete | 2026-08-18 |
 | 3. bisect + blame | v0.2 | 4/4 | Complete    | 2026-09-07 |
-| 03.1. Turn heatmap | v0.2 | 3/4 | Gap closure | 2026-09-08 |
+| 03.1. Turn heatmap | v0.2 | 4/4 | Complete   | 2026-09-08 |
 | 4. Prompt capture | v0.3 | 0/? | Planned | — |
 | 5. MCP server | v0.3 | 0/? | Planned | — |
 | 6. Warren integration | v1.0 | 0/? | Planned | — |
@@ -105,7 +105,7 @@ Also shipped ad hoc, untracked by any phase (same pattern as Phase 2's SQLite ca
 **Goal:** `git turn heatmap` — a calendar-grid ANSI heatmap of turn activity across all sessions, colored by daily turn-count density, with an activity-summary block below the grid. One-shot plain-text CLI print, zero new dependencies.
 **Requirements**: D-01 (color by per-day turn count, not model/cost), D-02 (cross-session scope), D-03 (all-time, no `--since` flag), D-04 (activity-only summary stats) — see `03.1-CONTEXT.md`
 **Depends on:** Phase 3
-**Plans:** 3/4 plans complete (1 gap-closure plan open)
+**Plans:** 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -122,4 +122,4 @@ Plans:
 
 **Gap closure** *(from 03.1-VERIFICATION.md, status `gaps_found`)*
 
-- [ ] 03.1-04-PLAN.md — Fix WR-01: scope the density denominator to the rendered grid (`gridMaxCount(grid)`) instead of the all-time `dayMap`, add regression tests reproducing the off-window-burst failure, align code comments + AGENTS.md wording (D-01) [wave 1]
+- [x] 03.1-04-PLAN.md — Fix WR-01: scope the density denominator to the rendered grid (`gridMaxCount(grid)`) instead of the all-time `dayMap`, add regression tests reproducing the off-window-burst failure, align code comments + AGENTS.md wording (D-01) [wave 1]
