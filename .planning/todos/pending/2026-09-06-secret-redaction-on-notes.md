@@ -7,6 +7,8 @@ files:
   - src/git.js
 ---
 
+**Status (2026-09-10):** Folded into Phase 4 (Prompt capture) as a locked requirement — see `.planning/ROADMAP.md`'s Phase 4 detail block. Not tracked as a separate phase. This todo stays open (not moved to completed/) until Phase 4 is actually discussed/planned/executed, since the redaction work itself hasn't shipped yet — it's now scoped correctly, not done.
+
 ## Problem
 
 **Pre-emptive, not a live risk today** — checked during the 2026-09-07 doc-drift audit: nothing shipped writes prompt/response content into notes yet. The current payload is `{session_id, turn_n, snapshot_sha, ts}` (`src/hooks/post-commit.js`); `prompt`/`model`/`latency_ms` are read defensively elsewhere but unwritten until Phase 4 (prompt capture) ships. This todo should land *as part of* or *before* Phase 4, not independently against current code.

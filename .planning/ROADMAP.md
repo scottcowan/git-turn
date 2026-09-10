@@ -123,3 +123,10 @@ Plans:
 **Gap closure** *(from 03.1-VERIFICATION.md, status `gaps_found`)*
 
 - [x] 03.1-04-PLAN.md — Fix WR-01: scope the density denominator to the rendered grid (`gridMaxCount(grid)`) instead of the all-time `dayMap`, add regression tests reproducing the off-window-burst failure, align code comments + AGENTS.md wording (D-01) [wave 1]
+
+### Phase 4: Prompt capture
+
+**Goal:** `git turn record-prompt`, note storage for prompt/model/latency/usage, `--with-prompts` flag on `log`/`show`.
+**Depends on:** Phase 3
+**Locked requirement (folded in 2026-09-10, not a separate phase):** Secret redaction — before any prompt/response content is written into `refs/notes/git-turn`, scan for likely secrets (API keys, high-entropy tokens) and redact matches. This must be built into the same code path that adds prompt-writing from the start, not bolted on after. Reuse whatever secret pattern list warren's secret store maintains rather than inventing a new one. See `.planning/todos/pending/2026-09-06-secret-redaction-on-notes.md` for full rationale (also covers an alternative/complementary `git turn redact <N>` post-hoc command).
+**Plans:** Not yet planned.

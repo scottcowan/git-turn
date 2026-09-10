@@ -41,7 +41,6 @@ None currently — `sqlite-read-cache.md` (previously deferred here) shipped 202
 
 ## Operator Next Steps
 
-- Fold the secret-redaction requirement into Phase 4 (prompt capture) — recorded as a locked decision when Phase 4 is discussed/planned, not tracked as its own phase (see `.planning/todos/pending/2026-09-06-secret-redaction-on-notes.md`).
 - Run `/gsd-audit-milestone` for v0.2 (not yet run).
 - Once the above are done, re-run `/gsd-complete-milestone` to actually archive v0.2 (it was started and paused at the pre-flight gate on 2026-09-07 pending exactly these items).
 - Unrelated, lower priority: `.planning/todos/pending/2026-09-07-rich-diff-renderer.md` — richer full-line-highlight diff style, not blocking milestone close.
