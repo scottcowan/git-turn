@@ -60,7 +60,11 @@ async function createCheckpoint() {
   // Insert into SQLite cache (best-effort — never crash the commit)
   try {
     const { commitSha: prevSnapshotSha } = (() => {
-      // Previous turn's snapshot sha for diff baseline
+      // Previous turn's snapshot sha for diff baseline. Turn 0 never
+      // exists, so skip the rev-parse entirely on a session's first turn
+      // instead of letting git print a "fatal: ambiguous argument" to
+      // stderr that gitSafe swallows in JS but not in the terminal.
+      if (turnN <= 1) return { commitSha: null };
       const prevRef = turnRef(session.session_id, turnN - 1);
       const prevSha = gitSafe(['rev-parse', prevRef]);
       return { commitSha: prevSha };

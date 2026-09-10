@@ -20,6 +20,22 @@ function sortTurns(turns) {
 // Ref-walk fallback — mirrors cache.js rebuild()'s for-each-ref walk exactly,
 // producing the normalized turn shape { session_id, turn_n, snapshot_sha,
 // head_sha, branch, ts } from refs/git-turn/sessions/ directly.
+// Parse the head/branch/created lines that post-commit.js writes into every
+// snapshot commit's own message body. This is the source of truth for a
+// turn's real HEAD sha — NOT refs/notes/git-turn, which has never carried a
+// `head` field (see 2026-09-10 integration audit: relying on notes' `head`
+// left log.js's --no-cache path and show.js showing the wrong commit).
+function parseSnapshotMessage(sha) {
+  const msg = gitSafe(['log', '-1', '--format=%B', sha]) || '';
+  let headSha = null, branch = null, ts = new Date(0).toISOString();
+  for (const msgLine of msg.split('\n')) {
+    if (msgLine.startsWith('head ')) headSha = msgLine.slice(5).trim();
+    if (msgLine.startsWith('branch ')) branch = msgLine.slice(7).trim();
+    if (msgLine.startsWith('created ')) ts = msgLine.slice(8).trim();
+  }
+  return { headSha, branch, ts };
+}
+
 function listAllTurnsFromRefs() {
   const refOutput = gitSafe(['for-each-ref',
     '--format=%(refname) %(objectname)',
@@ -34,13 +50,7 @@ function listAllTurnsFromRefs() {
     const [, sessionId, turnNStr] = m;
     const turnN = parseInt(turnNStr, 10);
 
-    const msg = gitSafe(['log', '-1', '--format=%B', sha]) || '';
-    let headSha = null, branch = null, ts = new Date(0).toISOString();
-    for (const msgLine of msg.split('\n')) {
-      if (msgLine.startsWith('head ')) headSha = msgLine.slice(5).trim();
-      if (msgLine.startsWith('branch ')) branch = msgLine.slice(7).trim();
-      if (msgLine.startsWith('created ')) ts = msgLine.slice(8).trim();
-    }
+    const { headSha, branch, ts } = parseSnapshotMessage(sha);
 
     turns.push({
       session_id: sessionId,
@@ -206,6 +216,7 @@ function annotateFromSnapshots(file, turns) {
 module.exports = {
   listAllTurns,
   listAllTurnsFromRefs,
+  parseSnapshotMessage,
   buildHeadShaIndex,
   isAncestor,
   reachableFrom,

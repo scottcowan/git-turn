@@ -2,6 +2,7 @@
 
 const { gitSafe } = require('../git');
 const { readSession, listTurns, NOTES_REF } = require('../session');
+const { parseSnapshotMessage } = require('../blame-util');
 
 function run(args) {
   const session = readSession();
@@ -52,11 +53,16 @@ function run(args) {
     let meta = {};
     try { meta = note ? JSON.parse(note) : {}; } catch {}
 
-    const msg = gitSafe(['log', '-1', '--format=%s', meta.head || sha]) || '';
+    // Real HEAD sha lives in the snapshot commit's own message body, not
+    // notes — refs/notes/git-turn has never carried a `head` field.
+    const { headSha } = parseSnapshotMessage(sha);
+    const head = headSha || sha;
+
+    const msg = gitSafe(['log', '-1', '--format=%s', head]) || '';
     const stat = gitSafe(['diff', '--shortstat', `${sha}^..${sha}`]) || '';
     const shortStat = stat.replace(/\s+/g, ' ').trim();
 
-    console.log(`  turn ${String(turn_n).padStart(2)}  ${(meta.head || sha).slice(0, 7)}  ${msg.slice(0, 50).padEnd(50)}  ${shortStat}`);
+    console.log(`  turn ${String(turn_n).padStart(2)}  ${head.slice(0, 7)}  ${msg.slice(0, 50).padEnd(50)}  ${shortStat}`);
 
     if (withPrompts && meta.prompt) {
       console.log(`         prompt: ${meta.prompt.slice(0, 80)}...`);

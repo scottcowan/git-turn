@@ -2,6 +2,7 @@
 
 const { git, gitSafe, shouldColor } = require('../git');
 const { readSession, listTurns, NOTES_REF } = require('../session');
+const { parseSnapshotMessage } = require('../blame-util');
 
 function run(args) {
   const session = readSession();
@@ -21,8 +22,13 @@ function run(args) {
   let meta = {};
   try { meta = note ? JSON.parse(note) : {}; } catch {}
 
+  // Real HEAD sha lives in the snapshot commit's own message body, not
+  // notes — refs/notes/git-turn has never carried a `head` field.
+  const { headSha } = parseSnapshotMessage(turn.sha);
+  const head = headSha || turn.sha;
+
   // Header
-  console.log(`Turn ${turnN}  ${(meta.head || turn.sha).slice(0, 7)}  ${new Date(meta.ts || 0).toLocaleString()}`);
+  console.log(`Turn ${turnN}  ${head.slice(0, 7)}  ${new Date(meta.ts || 0).toLocaleString()}`);
   if (meta.model) console.log(`Model: ${meta.model}`);
   if (meta.latency_ms) console.log(`Latency: ${meta.latency_ms}ms`);
   if (meta.prompt) {
