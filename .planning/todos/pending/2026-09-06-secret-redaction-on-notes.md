@@ -2,6 +2,7 @@
 created: 2026-09-06T11:49:20.072Z
 title: Add secret redaction for turn notes before they're written
 area: security
+resolves_phase: 4
 files:
   - src/hooks/post-commit.js
   - src/git.js
