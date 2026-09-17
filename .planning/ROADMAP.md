@@ -4,8 +4,9 @@
 
 - ✅ **v0.1 Working CLI** — Phase 1 (shipped 2026-08-09)
 - ✅ **v0.2 Read Cache + Blame/Bisect** — Phases 1-3, 03.1 (shipped 2026-09-17)
-- 📋 **v0.3 Prompt Capture + MCP** — Phases 4-5 (planned)
-- 📋 **v1.0 Warren Integration** — Phase 6 (planned)
+- 📋 **v0.3 Prompt Capture** — Phases 4-6 (planned)
+- 📋 **v0.4 MCP Server** — Phase 7 (planned)
+- 📋 **v1.0 Warren Integration** — Phase 8 (planned)
 
 ## Phases
 
@@ -33,23 +34,73 @@ Archive: `.planning/milestones/v0.2-ROADMAP.md`, audit: `.planning/milestones/v0
 
 </details>
 
-### 📋 v0.3 Prompt Capture + MCP (Phases 4-5)
+### 📋 v0.3 Prompt Capture (Phases 4-6)
 
-- [ ] **Phase 4: Prompt capture** — `git turn record-prompt`, note storage, `--with-prompts` flag on log/show
-- [ ] **Phase 5: MCP server** — Claude Code addon, `git_turn_log`, `git_turn_show`, `git_turn_revert` tools
+**Milestone Goal:** Persist prompt/model/latency/usage metadata per turn, safely — with mandatory secret redaction on the write path and end-to-end verification against real data.
 
-### 📋 v1.0 Warren Integration (Phase 6)
+- [ ] **Phase 4: Secret Redaction Scanner** - Vendored regex + entropy scanner that redacts likely secrets in free-text content before it can reach a note
+- [ ] **Phase 5: record-prompt Note-Write Path** - `git turn record-prompt` attaches prompt/model/usage/latency/tool-summary metadata to a turn's note via safe read-merge-write
+- [ ] **Phase 6: Verification, Redact Command & Purge Procedure** - `--with-prompts`/`cost` proven against real captured data, plus `redact <N>` and a documented purge procedure for already-written secrets
 
-- [ ] **Phase 6: Warren integration** — `git turn branch --from N` → `POST /workspaces/{id}/branch`
+### 📋 v0.4 MCP Server (Phase 7)
+
+- [ ] **Phase 7: MCP server** — Claude Code addon, `git_turn_log`, `git_turn_show`, `git_turn_revert` tools
+
+### 📋 v1.0 Warren Integration (Phase 8)
+
+- [ ] **Phase 8: Warren integration** — `git turn branch --from N` → `POST /workspaces/{id}/branch`
 
 ## Phase Details
 
-### Phase 4: Prompt capture
+### Phase 4: Secret Redaction Scanner
+**Goal**: Prompt/response content is scanned for likely secrets and redacted before any of it can be written into a note — this must exist and be validated before any writer (Phase 5) touches real content.
+**Depends on**: Phase 03.1 (last shipped phase)
+**Requirements**: REDACT-01
+**Success Criteria** (what must be TRUE):
+  1. The scanner detects known vendor-prefixed secrets (AWS, GitHub, OpenAI, Anthropic, Slack, Google, Stripe keys, PEM blocks, generic `key=value` assignments) in sample text and replaces each match with a redaction marker.
+  2. The scanner also catches high-entropy tokens that have no recognizable vendor prefix, via a Shannon-entropy fallback (base64/hex thresholds), so unstructured secrets aren't missed.
+  3. The scanner is validated against realistic fixtures — pasted `.env` blocks, multi-line PEM keys, paraphrased secrets embedded in prose, low-entropy short secrets — with documented false-negative behavior, not just vendor-pattern happy-path cases.
+  4. The scanner runs unconditionally with no bypass/opt-out flag, ready to be called from any note-write path.
+**Plans**: TBD
 
-**Goal:** `git turn record-prompt`, note storage for prompt/model/latency/usage, `--with-prompts` flag on `log`/`show`.
-**Depends on:** Phase 3
-**Locked requirement (folded in 2026-09-10, not a separate phase):** Secret redaction — before any prompt/response content is written into `refs/notes/git-turn`, scan for likely secrets (API keys, high-entropy tokens) and redact matches. This must be built into the same code path that adds prompt-writing from the start, not bolted on after. Reuse whatever secret pattern list warren's secret store maintains rather than inventing a new one. See `.planning/todos/pending/2026-09-06-secret-redaction-on-notes.md` for full rationale (also covers an alternative/complementary `git turn redact <N>` post-hoc command).
-**Plans:** Not yet planned.
+### Phase 5: record-prompt Note-Write Path
+**Goal**: `git turn record-prompt` lets a user attach prompt/model/latency/usage/tool-summary metadata to the current turn's note, safely and without clobbering what the post-commit hook already wrote.
+**Depends on**: Phase 4
+**Requirements**: CAPTURE-01, CAPTURE-02, CAPTURE-03, CAPTURE-04
+**Success Criteria** (what must be TRUE):
+  1. Running `git turn record-prompt` after a turn adds prompt/model/usage fields to that turn's note while `session_id`/`turn_n`/`snapshot_sha`/`ts` (written by the hook) remain intact — target turn resolved via `listTurns()`/`parseSnapshotMessage()`, never bare `HEAD`, via a read-merge-write helper with retry-on-conflict.
+  2. Any prompt/response content passed to `record-prompt` is redacted through Phase 4's scanner before the note is written — no secret ever lands in `refs/notes/git-turn`.
+  3. `usage` is written in the exact Anthropic-shape schema (`input_tokens`/`output_tokens`/`cache_read_input_tokens`/`cache_creation_input_tokens`).
+  4. When the caller supplies start/stop timestamps to `record-prompt`, `latency_ms` is captured on the note.
+  5. A tool-call count/name summary can be attached to the note alongside prompt metadata.
+**Plans**: TBD
+
+### Phase 6: Verification, Redact Command & Purge Procedure
+**Goal**: Captured prompt/model/usage data renders and prices correctly end-to-end through the already-shipped read side, and there's a real remediation path for a secret that made it into a note anyway.
+**Depends on**: Phase 5
+**Requirements**: REDACT-02, REDACT-03, VERIFY-01, VERIFY-02
+**Success Criteria** (what must be TRUE):
+  1. `git turn log --with-prompts` and `git turn show --with-prompts` render real captured prompt/model/latency data end-to-end (against a real repo with a real `record-prompt` note, not just isolated unit fixtures).
+  2. `git turn cost` computes correct dollar costs from real captured `usage` data end-to-end.
+  3. A user can run `git turn redact <N>` to manually scrub a specific turn's note content after the fact.
+  4. A documented purge procedure (reflog-expire + `gc --prune=now` scoped to `refs/notes/git-turn`) exists and is verified to actually remove an old note blob, since neither `git filter-repo` nor BFG cover this ref namespace.
+**Plans**: TBD
+
+### Phase 7: MCP server
+**Goal**: Claude Code can drive git-turn via an MCP addon exposing `git_turn_log`, `git_turn_show`, `git_turn_revert` tools.
+**Depends on**: Phase 6
+**Requirements**: TBD (scoped at v0.4 planning)
+**Success Criteria** (what must be TRUE):
+  1. TBD — scoped at v0.4 planning.
+**Plans**: Not yet planned.
+
+### Phase 8: Warren integration
+**Goal**: `git turn branch --from <N>` creates a warren workspace branched from a specific turn.
+**Depends on**: Phase 7, Warren API availability
+**Requirements**: TBD (scoped at v1.0 planning)
+**Success Criteria** (what must be TRUE):
+  1. TBD — scoped at v1.0 planning, blocked on the Warren API.
+**Plans**: Not yet planned.
 
 ## Progress
 
@@ -59,8 +110,10 @@ Archive: `.planning/milestones/v0.2-ROADMAP.md`, audit: `.planning/milestones/v0
 | 2. SQLite read cache | v0.2 | shipped (ungoverned) | Complete | 2026-08-18 |
 | 3. bisect + blame | v0.2 | 4/4 | Complete | 2026-09-07 |
 | 03.1. Turn heatmap | v0.2 | 4/4 | Complete | 2026-09-08 |
-| 4. Prompt capture | v0.3 | 0/? | Planned | — |
-| 5. MCP server | v0.3 | 0/? | Planned | — |
-| 6. Warren integration | v1.0 | 0/? | Planned | — |
+| 4. Secret redaction scanner | v0.3 | 0/? | Not started | — |
+| 5. record-prompt note-write path | v0.3 | 0/? | Not started | — |
+| 6. Verification, redact command & purge procedure | v0.3 | 0/? | Not started | — |
+| 7. MCP server | v0.4 | 0/? | Planned | — |
+| 8. Warren integration | v1.0 | 0/? | Planned | — |
 
 Also shipped ad hoc, untracked by any phase (same pattern as Phase 2's SQLite cache): `session new`/`session list` (fork lineage) and `export` (cross-repo ref bundle) — commit `7b446ce`, 2026-09-06.

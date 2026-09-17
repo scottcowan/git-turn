@@ -33,4 +33,16 @@
 
 ## Traceability
 
-_Filled by roadmapper during roadmap creation._
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CAPTURE-01 | Phase 5 | Pending |
+| CAPTURE-02 | Phase 5 | Pending |
+| CAPTURE-03 | Phase 5 | Pending |
+| CAPTURE-04 | Phase 5 | Pending |
+| REDACT-01 | Phase 4 | Pending |
+| REDACT-02 | Phase 6 | Pending |
+| REDACT-03 | Phase 6 | Pending |
+| VERIFY-01 | Phase 6 | Pending |
+| VERIFY-02 | Phase 6 | Pending |
+
+Coverage: 9/9 v1 requirements mapped.

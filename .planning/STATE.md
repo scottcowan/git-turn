@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: Prompt Capture
 status: planning
-last_updated: "2026-09-17T16:43:06.179Z"
+last_updated: "2026-09-17T19:49:00.000Z"
 last_activity: 2026-09-17
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,12 +15,40 @@ progress:
 
 # Project State
 
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-09-17)
+
+**Core value:** Know exactly which agent turn broke your code — diff, blame, bisect, and revert at turn granularity.
+**Current focus:** Phase 4 — Secret Redaction Scanner
+
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-09-17 — Milestone v0.3 started
+Phase: 4 of 6 (Secret Redaction Scanner) — v0.3 Prompt Capture
+Plan: — (not yet planned)
+Status: Roadmap created, ready to plan
+Last activity: 2026-09-17 — ROADMAP.md created for v0.3 (Phases 4-6), REQUIREMENTS.md traceability filled (9/9 mapped)
+
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0 (this milestone)
+- Average duration: n/a
+- Total execution time: n/a
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+**Recent Trend:**
+- Last 5 plans: n/a
+- Trend: n/a
+
+*Updated after each plan completion*
 
 ## Decisions
 
@@ -29,33 +57,31 @@ Last activity: 2026-09-17 — Milestone v0.3 started
 - jj-style op log in .git/git-turn/ops/
 - No shell interpolation — execFile only
 - Separate repo from warren
-- [Phase 03-01]: Embedded head/branch/created lines in turn-fixtures.js snapshot messages to match post-commit.js real format, enabling ref-walk fallback head_sha population
-- [Phase 03-bisect-blame]: Namespace-imported blame-util to satisfy grep-based acceptance criteria requiring single-line match counts
-- [Phase 03-03]: Factored the guarded pre-bisect restore into one restorePreBisectState helper shared by finally and both signal handlers to prevent the recovery-hint string from drifting
-- [Phase 03-03]: Exit-125 (untestable) advances lo=mid+1 rather than inventing a distinct skip-branch, per the plan's canonical git-bisect narrowing instruction
+- [v0.3 roadmap]: "Reuse warren's secret pattern list" retired — warren has no content-based secret detector; Phase 4 builds a new vendored regex + entropy scanner instead
+- [v0.3 roadmap]: Cache schema migration (`usage` column) folded into Phase 5 as an implementation prerequisite rather than a standalone roadmap phase — no independent user-observable behavior of its own
+- [v0.3 roadmap]: `redact <N>` and the purge procedure (REDACT-02/03) grouped with verification (Phase 6) rather than with the scanner (Phase 4), since both are post-hoc remediation for the write path Phase 5 delivers
+- [v0.3 roadmap]: MCP server moved out of v0.3 (per PROJECT.md, deferred) — renumbered as v0.4 Phase 7; Warren integration shifted to Phase 8
+
+## Pending Todos
+
+- `2026-09-06-secret-redaction-on-notes.md` [security] — now scoped across Phase 4 (scanner) + Phase 6 (redact/purge), not a single locked requirement on one phase
+- `2026-09-07-rich-diff-renderer.md` [cli] — optional enhancement over shipped color-diff
+- `2026-09-17-mindwalk-integration.md` [integration] — explore turn-boundary markers for mindwalk's session replay via a preprocessing script, not a fork
+
+## Blockers/Concerns
+
+- Cross-process race window between the post-commit hook and `record-prompt` (Phase 5) has no existing lock primitive — flagged in research for deeper investigation during `/gsd-plan-phase 5`.
+- Secret-scanner false-negative behavior against freeform conversational text is reasoned, not empirically validated — Phase 4 planning should budget for building a realistic fixture set, not just vendor-pattern unit tests.
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close on 2026-09-17:
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| uat | 03-UAT.md (Phase 03) | resolved, 0 pending scenarios | v0.2 close |
+| feature | MCP server | planned, moved to v0.4 (Phase 7) | v0.3 roadmap creation, 2026-09-17 |
 
-| Category | Item | Status |
-|----------|------|--------|
-| uat | 03-UAT.md (Phase 03) | resolved, 0 pending scenarios — audit tool false-positive flag |
-| todo | 2026-09-06-secret-redaction-on-notes.md | pending, folded into Phase 4 as locked requirement |
-| todo | 2026-09-07-rich-diff-renderer.md | pending, optional enhancement over shipped color-diff |
+## Session Continuity
 
-## Operator Next Steps
-
-- Start the next milestone with /gsd-new-milestone
-
-## Accumulated Context
-
-### Roadmap Evolution
-
-- Phase 03.1 inserted after Phase 3: Turn heatmap — calendar grid of turn activity by model/agent (URGENT)
-
-### Pending Todos
-
-- `2026-09-06-secret-redaction-on-notes.md` [security] — folded into Phase 4 as locked requirement
-- `2026-09-07-rich-diff-renderer.md` [cli] — optional enhancement over shipped color-diff
-- `2026-09-17-mindwalk-integration.md` [integration] — explore turn-boundary markers for mindwalk's session replay via a preprocessing script, not a fork
+Last session: 2026-09-17 19:49
+Stopped at: ROADMAP.md and REQUIREMENTS.md traceability written for v0.3 (Phases 4-6); ready for `/gsd-plan-phase 4`
+Resume file: None
