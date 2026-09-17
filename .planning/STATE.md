@@ -1,26 +1,26 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.2
-milestone_name: Read Cache + Blame/Bisect
-status: Awaiting next milestone
-last_updated: "2026-09-17T15:54:23.612Z"
-last_activity: 2026-09-17 — Milestone v0.2 completed and archived
+milestone: v0.3
+milestone_name: Prompt Capture
+status: planning
+last_updated: "2026-09-17T16:43:06.179Z"
+last_activity: 2026-09-17
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 20
-  completed_plans: 20
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: Milestone v0.2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-17 — Milestone v0.2 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-17 — Milestone v0.3 started
 
 ## Decisions
 

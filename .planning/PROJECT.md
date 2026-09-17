@@ -38,9 +38,17 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 **Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (secret redaction on notes, folded into Phase 4 as a locked requirement; and the rich diff renderer, an optional enhancement).
 
-## Next Milestone Goals
+## Current Milestone: v0.3 Prompt Capture
 
-v0.3 (Prompt Capture + MCP): `git turn record-prompt` with secret-redaction built into the write path from day one, `--with-prompts` on `log`/`show`, and an MCP server addon exposing `git_turn_log`/`git_turn_show`/`git_turn_revert` to Claude Code.
+**Goal:** Persist prompt/model/latency/usage metadata per turn, safely.
+
+**Target features:**
+- `git turn record-prompt` — attach prompt/response metadata to the current turn's note
+- Note payload gains `prompt`/`model`/`latency_ms`/`usage` fields (currently read defensively, never written)
+- Secret redaction built into the write path from day one — scan for likely secrets (API keys, high-entropy tokens) before any prompt/response content is written into `refs/notes/git-turn`; reuse warren's secret pattern list rather than inventing a new one
+- `--with-prompts` flag on `log`/`show` to surface captured prompt content
+
+MCP server (Claude Code addon) deferred to a later milestone — out of scope for v0.3.
 
 ## Prior art
 
@@ -48,5 +56,22 @@ v0.3 (Prompt Capture + MCP): `git turn record-prompt` with secret-redaction buil
 - copilot-timeline-session (mmcs-work) — untracked exclusion, hash-keyed sidecar
 - Jujutsu — content-addressed op log, op restore via update-ref only
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-09-17 after v0.2 milestone*
+*Last updated: 2026-09-17 after v0.2 milestone, v0.3 started*
