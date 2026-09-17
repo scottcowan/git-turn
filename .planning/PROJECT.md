@@ -27,6 +27,7 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 - **Hook fires on every commit** — serialized via pending-promise to prevent concurrent writes
 - **Read-only turns skipped** — no commit = no snapshot (Option 1)
 - **Separate from warren** — works in any git repo; warren is optional for `git turn branch`
+- **Secret redaction is vendored, not borrowed** — warren has no content/regex secret detector (only an encrypted credential store), so `src/redact.js` (Phase 4) is a hand-vendored regex + Shannon-entropy scanner modeled on gitleaks/trufflehog patterns, zero new npm dependencies
 
 ## Current State
 
@@ -34,18 +35,20 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 14 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`, `heatmap`. Full test suite (145 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
 
-**Not yet implemented:** `branch --from <N>` (Phase 6, blocked on the Warren API). Prompt capture (Phase 4) and MCP server (Phase 5) — planned for v0.3.
+**Not yet implemented:** `branch --from <N>` (Phase 6, blocked on the Warren API). `record-prompt` write path (Phase 5) and MCP server (Phase 7, v0.4) — planned.
 
-**Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (secret redaction on notes, folded into Phase 4 as a locked requirement; and the rich diff renderer, an optional enhancement).
+**Phase 4 complete (2026-09-17):** `src/redact.js` — a standalone, zero-dependency secret scanner (`redact(text) -> { text, count }`) covering 9 vendor-prefixed categories (AWS, GitHub, OpenAI, Anthropic, Slack, Google, Stripe, PEM, generic key=value) plus a Shannon-entropy fallback for unstructured tokens, with a SHA/UUID whitelist to avoid false-positive redaction of legitimate git identifiers. Validated against realistic fixtures (22 tests) with documented false-negative behavior. Not yet wired into any note-write path — that's Phase 5.
+
+**Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (rich diff renderer, an optional enhancement; mindwalk integration exploration).
 
 ## Current Milestone: v0.3 Prompt Capture
 
 **Goal:** Persist prompt/model/latency/usage metadata per turn, safely.
 
 **Target features:**
-- `git turn record-prompt` — attach prompt/response metadata to the current turn's note
+- `git turn record-prompt` — attach prompt/response metadata to the current turn's note (Phase 5, in progress)
 - Note payload gains `prompt`/`model`/`latency_ms`/`usage` fields (currently read defensively, never written)
-- Secret redaction built into the write path from day one — scan for likely secrets (API keys, high-entropy tokens) before any prompt/response content is written into `refs/notes/git-turn`; reuse warren's secret pattern list rather than inventing a new one
+- Secret redaction built into the write path from day one — ✓ shipped in Phase 4 (`src/redact.js`), not yet wired into a writer
 - `--with-prompts` flag on `log`/`show` to surface captured prompt content
 
 MCP server (Claude Code addon) deferred to a later milestone — out of scope for v0.3.
@@ -74,4 +77,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-17 after v0.2 milestone, v0.3 started*
+*Last updated: 2026-09-17 after Phase 4 (secret redaction scanner) completion*
