@@ -30,13 +30,17 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 ## Current State
 
-**Shipped:** v0.1 (Working CLI, 2026-08-09) through v0.2 (SQLite cache + bisect/blame). `session`/`export` shipped ad hoc from todos, same pattern as the SQLite cache did. Phase 03.1 complete: `git turn heatmap` (calendar-grid ANSI heatmap of cross-session turn activity, colored by day-count density scoped to the rendered window, with an activity-only summary block).
+**Shipped:** v0.2 (Read Cache + Blame/Bisect) as of 2026-09-17 — see `.planning/milestones/v0.2-ROADMAP.md` and `.planning/milestones/v0.2-MILESTONE-AUDIT.md` (audit: passed). Covers v0.1 (Working CLI) through Phase 03.1 (turn heatmap): SQLite read cache, real `blame`/`bisect` at turn granularity, calendar-grid heatmap, colorized diff output, session fork lineage (`session new --from`), and cross-repo `export`.
 
 14 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`, `heatmap`. Full test suite (145 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
 
-**Not yet implemented:** `branch --from <N>` (Phase 6, blocked on the Warren API).
+**Not yet implemented:** `branch --from <N>` (Phase 6, blocked on the Warren API). Prompt capture (Phase 4) and MCP server (Phase 5) — planned for v0.3.
 
-**Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (secret redaction on notes and the rich diff renderer are the current pending items).
+**Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (secret redaction on notes, folded into Phase 4 as a locked requirement; and the rich diff renderer, an optional enhancement).
+
+## Next Milestone Goals
+
+v0.3 (Prompt Capture + MCP): `git turn record-prompt` with secret-redaction built into the write path from day one, `--with-prompts` on `log`/`show`, and an MCP server addon exposing `git_turn_log`/`git_turn_show`/`git_turn_revert` to Claude Code.
 
 ## Prior art
 
@@ -45,4 +49,4 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 - Jujutsu — content-addressed op log, op restore via update-ref only
 
 ---
-*Last updated: 2026-09-08*
+*Last updated: 2026-09-17 after v0.2 milestone*
