@@ -1,0 +1,36 @@
+# Requirements: v0.3 Prompt Capture
+
+## v1 Requirements
+
+### Capture
+
+- [ ] **CAPTURE-01**: `git turn record-prompt` attaches prompt/model/usage/latency metadata to the current turn's note without clobbering the post-commit hook's existing fields (`session_id`/`turn_n`/`snapshot_sha`/`ts`) — read-merge-write with retry-on-conflict, target commit resolved via the turn index (`listTurns()`/`parseSnapshotMessage()`), never bare `HEAD`
+- [ ] **CAPTURE-02**: `usage` is written in the exact Anthropic-shape schema (`input_tokens`/`output_tokens`/`cache_read_input_tokens`/`cache_creation_input_tokens`) so `git turn cost` computes real costs instead of silently showing `$0.00`
+- [ ] **CAPTURE-03**: `latency_ms` is captured when the caller supplies start/stop timestamps to `record-prompt`
+- [ ] **CAPTURE-04**: A tool-call count/name summary can be attached alongside prompt metadata
+
+### Redaction
+
+- [ ] **REDACT-01**: All prompt/response content is scanned for secrets (curated vendor-prefix regexes + Shannon-entropy fallback) and redacted before any note write — unconditional, no opt-out flag
+- [ ] **REDACT-02**: `git turn redact <N>` lets a user manually scrub a specific turn's note content after the fact
+- [ ] **REDACT-03**: A documented purge procedure (reflog-expire + `gc --prune=now` scoped to `refs/notes/git-turn`) exists for removing already-written secret blobs, since neither `git filter-repo` nor BFG cover this ref namespace
+
+### Verification
+
+- [ ] **VERIFY-01**: `git turn log --with-prompts` and `git turn show --with-prompts` render real captured prompt/model/latency data end-to-end (not just unit-tested in isolation)
+- [ ] **VERIFY-02**: `git turn cost` computes correct dollar costs from real captured `usage` data end-to-end
+
+## Future Requirements
+
+- MCP server (Claude Code addon exposing `git_turn_log`/`git_turn_show`/`git_turn_revert`) — deferred to a later milestone (previously sketched as Phase 5)
+- Claude Code Stop-hook wrapper to auto-supply `latency_ms`/prompt content to `record-prompt` — natural v0.3.x follow-on once `record-prompt` exists
+
+## Out of Scope
+
+- Full transcript/conversation storage — conflicts with "notes stay small" design, multiplies redaction attack surface
+- Image/multimodal prompt content — no terminal render path exists, would bloat notes with base64
+- Streaming/partial note updates — conflicts with the existing serialized single-write design
+
+## Traceability
+
+_Filled by roadmapper during roadmap creation._
