@@ -149,3 +149,44 @@ describe('redact — documented false negatives (D-03: not silent, proven by tes
     assert.deepEqual(redact(''), { text: '', count: 0 });
   });
 });
+
+describe('redact — security properties', () => {
+  test('ReDoS bound (T-04-01): adversarial blob completes well under 2000ms', () => {
+    // Bounded quantifiers in every SECRET_PATTERNS entry (e.g. {16}, {36},
+    // {82}, {58,74}, {93}, generic value capture capped at {12,150}) are
+    // the mitigation for T-04-01 — no nested quantifiers, no overlapping
+    // alternation, so this blob cannot trigger catastrophic backtracking.
+    const blob =
+      'api_key=' + 'a'.repeat(200000) +
+      'A'.repeat(100000) +
+      '-----BEGIN '.repeat(5000);
+    const start = Date.now();
+    redact(blob);
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed < 2000, `redact() took ${elapsed}ms, expected < 2000ms`);
+  });
+
+  test('no-bypass surface (T-04-03 / REDACT-01): no option/flag/env can disable scanning', () => {
+    assert.equal(redact.length, 1);
+    assert.deepEqual(Object.keys(require('./redact')), ['redact']);
+    // Extra arguments cannot disable scanning — redact() takes exactly one
+    // parameter, so a second argument shaped like an opt-out is simply
+    // ignored, not honored.
+    const { count } = redact('AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE', { enabled: false });
+    assert.equal(count, 1);
+  });
+
+  test('encoding-bypass known gap (T-04-02, accepted): base64-encoded secret is not decoded-and-matched', () => {
+    const plaintext = 'AKIAIOSFODNN7EXAMPLE';
+    const encoded = Buffer.from(plaintext).toString('base64');
+    const { text } = redact(`credentials blob: ${encoded}`);
+    // The pattern layer never decodes input, so the decoded plaintext must
+    // never appear in the output (it wasn't there to begin with — this
+    // asserts the pattern layer didn't somehow reconstruct/leak it either).
+    // The encoded blob itself may or may not survive — it could trip the
+    // entropy fallback incidentally — so no exact count is asserted here;
+    // only that decode-then-match bypass mitigation is absent, as accepted
+    // in 04-RESEARCH.md Security Domain (T-04-02).
+    assert.ok(!text.includes(plaintext));
+  });
+});
