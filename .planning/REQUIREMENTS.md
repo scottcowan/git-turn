@@ -11,7 +11,7 @@
 
 ### Redaction
 
-- [ ] **REDACT-01**: All prompt/response content is scanned for secrets (curated vendor-prefix regexes + Shannon-entropy fallback) and redacted before any note write — unconditional, no opt-out flag
+- [x] **REDACT-01**: All prompt/response content is scanned for secrets (curated vendor-prefix regexes + Shannon-entropy fallback) and redacted before any note write — unconditional, no opt-out flag
 - [ ] **REDACT-02**: `git turn redact <N>` lets a user manually scrub a specific turn's note content after the fact
 - [ ] **REDACT-03**: A documented purge procedure (reflog-expire + `gc --prune=now` scoped to `refs/notes/git-turn`) exists for removing already-written secret blobs, since neither `git filter-repo` nor BFG cover this ref namespace
 
@@ -39,7 +39,7 @@
 | CAPTURE-02 | Phase 5 | Pending |
 | CAPTURE-03 | Phase 5 | Pending |
 | CAPTURE-04 | Phase 5 | Pending |
-| REDACT-01 | Phase 4 | Pending |
+| REDACT-01 | Phase 4 | Complete |
 | REDACT-02 | Phase 6 | Pending |
 | REDACT-03 | Phase 6 | Pending |
 | VERIFY-01 | Phase 6 | Pending |
