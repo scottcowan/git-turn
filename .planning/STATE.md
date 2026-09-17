@@ -53,3 +53,9 @@ Items acknowledged and deferred at milestone close on 2026-09-17:
 ### Roadmap Evolution
 
 - Phase 03.1 inserted after Phase 3: Turn heatmap — calendar grid of turn activity by model/agent (URGENT)
+
+### Pending Todos
+
+- `2026-09-06-secret-redaction-on-notes.md` [security] — folded into Phase 4 as locked requirement
+- `2026-09-07-rich-diff-renderer.md` [cli] — optional enhancement over shipped color-diff
+- `2026-09-17-mindwalk-integration.md` [integration] — explore turn-boundary markers for mindwalk's session replay via a preprocessing script, not a fork
