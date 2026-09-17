@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: Read Cache + Blame/Bisect
-status: closing
-last_updated: "2026-09-10T15:35:35.000Z"
-last_activity: 2026-09-10 -- Resolved orphaned Phase 3 UAT session, closed heatmap todo
+status: completed
+last_updated: "2026-09-17T15:49:19.000Z"
+last_activity: 2026-09-17
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 14
+  completed_plans: 14
   percent: 100
-stopped_at: All v0.2 phases (1, 2, 3, 03.1) complete; /gsd-complete-milestone still paused at pre-flight gate
 ---
 
 # Project State
@@ -20,8 +19,8 @@ stopped_at: All v0.2 phases (1, 2, 3, 03.1) complete; /gsd-complete-milestone st
 
 Phase: 03.1 (turn-heatmap) — Complete
 Plan: 4/4 complete (incl. one gap-closure round)
-Status: All v0.2 phase work done; milestone close still pending (audit + redaction-fold outstanding)
-Last activity: 2026-09-10
+Status: v0.2 milestone audit complete (passed) — see `.planning/v0.2-MILESTONE-AUDIT.md`
+Last activity: 2026-09-17
 
 ## Decisions
 
@@ -41,9 +40,9 @@ None currently — `sqlite-read-cache.md` (previously deferred here) shipped 202
 
 ## Operator Next Steps
 
-- Run `/gsd-audit-milestone` for v0.2 (not yet run).
-- Once the above are done, re-run `/gsd-complete-milestone` to actually archive v0.2 (it was started and paused at the pre-flight gate on 2026-09-07 pending exactly these items).
+- Run `/gsd-complete-milestone 0.2` to archive v0.2 — audit passed 2026-09-17 (see `.planning/v0.2-MILESTONE-AUDIT.md`).
 - Unrelated, lower priority: `.planning/todos/pending/2026-09-07-rich-diff-renderer.md` — richer full-line-highlight diff style, not blocking milestone close.
+- Unrelated, lower priority: `.planning/todos/pending/2026-09-06-secret-redaction-on-notes.md` — folded into Phase 4, build when Phase 4 is planned.
 
 ## Accumulated Context
 
