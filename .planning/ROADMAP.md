@@ -38,7 +38,7 @@ Archive: `.planning/milestones/v0.2-ROADMAP.md`, audit: `.planning/milestones/v0
 
 **Milestone Goal:** Persist prompt/model/latency/usage metadata per turn, safely — with mandatory secret redaction on the write path and end-to-end verification against real data.
 
-- [ ] **Phase 4: Secret Redaction Scanner** - Vendored regex + entropy scanner that redacts likely secrets in free-text content before it can reach a note
+- [x] **Phase 4: Secret Redaction Scanner** - Vendored regex + entropy scanner that redacts likely secrets in free-text content before it can reach a note (completed 2026-09-17)
 - [ ] **Phase 5: record-prompt Note-Write Path** - `git turn record-prompt` attaches prompt/model/usage/latency/tool-summary metadata to a turn's note via safe read-merge-write
 - [ ] **Phase 6: Verification, Redact Command & Purge Procedure** - `--with-prompts`/`cost` proven against real captured data, plus `redact <N>` and a documented purge procedure for already-written secrets
 
@@ -64,7 +64,7 @@ Archive: `.planning/milestones/v0.2-ROADMAP.md`, audit: `.planning/milestones/v0
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04-01-PLAN.md — `src/redact.js` scanner (9 vendor regex patterns, whitelist-gated Shannon-entropy fallback) + `src/redact.test.js` fixture suite with documented false negatives and proven security properties
+- [x] 04-01-PLAN.md — `src/redact.js` scanner (9 vendor regex patterns, whitelist-gated Shannon-entropy fallback) + `src/redact.test.js` fixture suite with documented false negatives and proven security properties
 
 ### Phase 5: record-prompt Note-Write Path
 **Goal**: `git turn record-prompt` lets a user attach prompt/model/latency/usage/tool-summary metadata to the current turn's note, safely and without clobbering what the post-commit hook already wrote.
@@ -113,7 +113,7 @@ Plans:
 | 2. SQLite read cache | v0.2 | shipped (ungoverned) | Complete | 2026-08-18 |
 | 3. bisect + blame | v0.2 | 4/4 | Complete | 2026-09-07 |
 | 03.1. Turn heatmap | v0.2 | 4/4 | Complete | 2026-09-08 |
-| 4. Secret redaction scanner | v0.3 | 0/1 | Planned | — |
+| 4. Secret redaction scanner | v0.3 | 1/1 | Complete   | 2026-09-17 |
 | 5. record-prompt note-write path | v0.3 | 0/? | Not started | — |
 | 6. Verification, redact command & purge procedure | v0.3 | 0/? | Not started | — |
 | 7. MCP server | v0.4 | 0/? | Planned | — |
