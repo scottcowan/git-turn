@@ -1,0 +1,192 @@
+'use strict';
+
+const { describe, test } = require('node:test');
+const assert = require('node:assert/strict');
+const { redact } = require('./redact');
+
+describe('redact — vendor pattern coverage (D-02: all 9 categories)', () => {
+  test('redacts an AWS access key ID', () => {
+    const { text, count } = redact('export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE');
+    assert.equal(count, 1);
+    assert.ok(!text.includes('AKIAIOSFODNN7EXAMPLE'));
+    assert.ok(text.includes('[REDACTED]'));
+  });
+
+  test('redacts a GitHub classic PAT', () => {
+    const token = 'ghp_' + '1'.repeat(36);
+    const { count, text } = redact(`use ${token} to auth`);
+    assert.equal(count, 1);
+    assert.ok(!text.includes(token));
+  });
+
+  test('redacts a GitHub fine-grained PAT', () => {
+    const token = 'github_pat_' + 'a'.repeat(82);
+    const { count, text } = redact(`use ${token} to auth`);
+    assert.equal(count, 1);
+    assert.ok(!text.includes(token));
+  });
+
+  test('redacts an OpenAI key (T3BlbkFJ marker present)', () => {
+    const token = 'sk-' + 'a'.repeat(20) + 'T3BlbkFJ' + 'b'.repeat(20);
+    assert.equal(redact(token).count, 1);
+  });
+
+  test('redacts an Anthropic key (sk-ant-api03- prefix, AA suffix)', () => {
+    const token = 'sk-ant-api03-' + 'x'.repeat(93) + 'AA';
+    assert.equal(redact(token).count, 1);
+  });
+
+  test('redacts a Slack bot token', () => {
+    assert.equal(redact('xoxb-1234567890123-1234567890123-abcdEFGHijkl').count, 1);
+  });
+
+  test('redacts a Google API key', () => {
+    const token = 'AIza' + 'A'.repeat(35);
+    assert.equal(redact(token).count, 1);
+  });
+
+  test('redacts a Stripe live secret key', () => {
+    const token = 'sk_live_' + 'B'.repeat(24);
+    assert.equal(redact(token).count, 1);
+  });
+
+  test('redacts a generic key=value assignment', () => {
+    const { count, text } = redact('API_KEY=abcdEFGH12345678ijkl');
+    assert.equal(count, 1);
+    assert.ok(!text.includes('abcdEFGH12345678ijkl'));
+  });
+
+  test('redacts a multi-line PEM private key header (SC1: PEM key fixture)', () => {
+    const pem = [
+      '-----BEGIN RSA PRIVATE KEY-----',
+      'MIIBOgIBAAJBAKj34GkxFhD90vcNLYBSbxCf1LMWWpn26EmyMvzRC8b7mLNSm3TQ',
+      't1uRJH9jNJEyOOe2wc02uSp2vGxrhFhCPjkCAwEAAQ...',
+      '-----END RSA PRIVATE KEY-----',
+    ].join('\n');
+    const { text, count } = redact(pem);
+    // Documented behavior (see 04-RESEARCH.md Pitfall 3): the header line
+    // pattern only matches the header itself; the base64 body below it is
+    // NOT separately pattern-matched by the vendor pass — it may still be
+    // caught by the entropy fallback if a body line clears the
+    // 20-char/4.5-bit floor. This particular fixture's body lines DO clear
+    // that floor, so count is intentionally asserted as >= 1 (header) not
+    // a fixed value — the exact body-line count is incidental to the
+    // entropy floor and must not be pinned as an implementation detail.
+    assert.ok(count >= 1);
+    assert.ok(text.includes('[REDACTED]'));
+    assert.ok(!text.includes('-----BEGIN RSA PRIVATE KEY-----'), 'PEM header must be redacted');
+  });
+
+  test('redacts a .env-style block with multiple secrets (SC3: .env fixture)', () => {
+    const envBlock = [
+      'DATABASE_URL=postgres://user:hunter2@localhost/db',
+      'STRIPE_SECRET_KEY=sk_live_' + 'C'.repeat(24),
+      'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE',
+    ].join('\n');
+    const { count } = redact(envBlock);
+    // Expect >= 2: the Stripe key and the AWS key are vendor-shaped and
+    // must both be caught. The embedded "hunter2" password is a documented
+    // false negative — see the dedicated low-entropy fixture below — so
+    // this assertion intentionally uses >= rather than a fixed count.
+    assert.ok(count >= 2);
+  });
+
+  test('marker format is untagged and reveals no secret fragment (D-01)', () => {
+    const { text } = redact('export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE');
+    assert.ok(text.includes('[REDACTED]'));
+    assert.ok(!/\[REDACTED[-:]/.test(text), 'marker must not be type-tagged');
+    assert.ok(!text.includes('AKIA'), 'no prefix fragment of the secret must survive');
+    assert.ok(!text.includes('MPLE'), 'no suffix fragment of the secret must survive');
+  });
+});
+
+describe('redact — SHA/UUID whitelist (D-03: must NOT redact)', () => {
+  test('does not redact a 40-hex git commit SHA', () => {
+    const sha = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3';
+    const { text, count } = redact(`see commit ${sha} for details`);
+    assert.ok(text.includes(sha), 'SHA must survive redaction untouched');
+    assert.equal(count, 0);
+  });
+
+  test('does not redact a UUID-v4 session id', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    const { text, count } = redact(`session ${uuid} failed`);
+    assert.ok(text.includes(uuid), 'UUID must survive redaction untouched');
+    assert.equal(count, 0);
+  });
+
+  test('a random high-entropy token with NO vendor prefix IS redacted (fallback works)', () => {
+    // 32-char base64, no vendor shape — must be caught by entropy alone.
+    const token = 'wcqv6MU0Bxy/EJs6ziRjRvtmqU8H3xcL';
+    const { text, count } = redact(`rotated secret: ${token}`);
+    assert.ok(!text.includes(token));
+    assert.equal(count, 1);
+  });
+});
+
+describe('redact — documented false negatives (D-03: not silent, proven by test)', () => {
+  test('KNOWN GAP: a paraphrased secret with no vendor marker is NOT redacted', () => {
+    const { text } = redact('the token is sk-abc123, does that look valid?');
+    // Intentionally asserts the secret text SURVIVES — this fixture
+    // documents/proves the false negative described in 04-RESEARCH.md
+    // Pitfall 4, rather than silently hoping no one notices the gap.
+    assert.ok(text.includes('sk-abc123'));
+  });
+
+  test('KNOWN GAP: a short, low-entropy password is NOT redacted', () => {
+    const { text } = redact('the password is hunter2');
+    assert.ok(text.includes('hunter2'));
+  });
+
+  test('does not redact ordinary prose with no secret-shaped content', () => {
+    const prose = 'Please refactor the auth middleware to use async/await.';
+    const { text, count } = redact(prose);
+    assert.equal(count, 0);
+    assert.equal(text, prose);
+  });
+
+  test('empty input returns empty output with zero count', () => {
+    assert.deepEqual(redact(''), { text: '', count: 0 });
+  });
+});
+
+describe('redact — security properties', () => {
+  test('ReDoS bound (T-04-01): adversarial blob completes well under 2000ms', () => {
+    // Bounded quantifiers in every SECRET_PATTERNS entry (e.g. {16}, {36},
+    // {82}, {58,74}, {93}, generic value capture capped at {12,150}) are
+    // the mitigation for T-04-01 — no nested quantifiers, no overlapping
+    // alternation, so this blob cannot trigger catastrophic backtracking.
+    const blob =
+      'api_key=' + 'a'.repeat(200000) +
+      'A'.repeat(100000) +
+      '-----BEGIN '.repeat(5000);
+    const start = Date.now();
+    redact(blob);
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed < 2000, `redact() took ${elapsed}ms, expected < 2000ms`);
+  });
+
+  test('no-bypass surface (T-04-03 / REDACT-01): no option/flag/env can disable scanning', () => {
+    assert.equal(redact.length, 1);
+    assert.deepEqual(Object.keys(require('./redact')), ['redact']);
+    // Extra arguments cannot disable scanning — redact() takes exactly one
+    // parameter, so a second argument shaped like an opt-out is simply
+    // ignored, not honored.
+    const { count } = redact('AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE', { enabled: false });
+    assert.equal(count, 1);
+  });
+
+  test('encoding-bypass known gap (T-04-02, accepted): base64-encoded secret is not decoded-and-matched', () => {
+    const plaintext = 'AKIAIOSFODNN7EXAMPLE';
+    const encoded = Buffer.from(plaintext).toString('base64');
+    const { text } = redact(`credentials blob: ${encoded}`);
+    // The pattern layer never decodes input, so the decoded plaintext must
+    // never appear in the output (it wasn't there to begin with — this
+    // asserts the pattern layer didn't somehow reconstruct/leak it either).
+    // The encoded blob itself may or may not survive — it could trip the
+    // entropy fallback incidentally — so no exact count is asserted here;
+    // only that decode-then-match bypass mitigation is absent, as accepted
+    // in 04-RESEARCH.md Security Domain (T-04-02).
+    assert.ok(!text.includes(plaintext));
+  });
+});

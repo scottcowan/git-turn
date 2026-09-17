@@ -1,9 +1,9 @@
 ---
 phase: 4
 slug: secret-redaction-scanner
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-09-17
 ---
 
@@ -38,11 +38,11 @@ created: 2026-09-17
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 04-01-01 | 01 | 1 | REDACT-01 | — | Detects and redacts all 9 vendor-prefixed secret categories | unit | `node --test src/redact.test.js` | ❌ W0 | ⬜ pending |
-| 04-01-02 | 01 | 1 | REDACT-01 | — | Catches high-entropy tokens with no vendor prefix (Shannon entropy fallback) | unit | `node --test src/redact.test.js` | ❌ W0 | ⬜ pending |
-| 04-01-03 | 01 | 1 | REDACT-01 | T-04-01 | Whitelists 40-hex git SHAs and UUID-v4 shapes from entropy fallback (D-03) — prevents false-positive redaction of legitimate commit/session references | unit | `node --test src/redact.test.js` | ❌ W0 | ⬜ pending |
-| 04-01-04 | 01 | 1 | REDACT-01 | — | Runs unconditionally — no bypass mechanism exists (`redact(text)` takes no options argument) | design review | code review — no runtime flag/parameter to disable | N/A | ⬜ pending |
-| 04-01-05 | 01 | 1 | REDACT-01 | — | Documents false-negative behavior against realistic fixtures (paraphrased secrets, low-entropy passwords) — SC3 | unit (asserting the known gap) | `node --test src/redact.test.js` | ❌ W0 | ⬜ pending |
+| 04-01-01 | 01 | 1 | REDACT-01 | — | Detects and redacts all 9 vendor-prefixed secret categories | unit | `node --test src/redact.test.js` | ✅ | ✅ green |
+| 04-01-02 | 01 | 1 | REDACT-01 | — | Catches high-entropy tokens with no vendor prefix (Shannon entropy fallback) | unit | `node --test src/redact.test.js` | ✅ | ✅ green |
+| 04-01-03 | 01 | 1 | REDACT-01 | T-04-01 | Whitelists 40-hex git SHAs and UUID-v4 shapes from entropy fallback (D-03) — prevents false-positive redaction of legitimate commit/session references | unit | `node --test src/redact.test.js` | ✅ | ✅ green |
+| 04-01-04 | 01 | 1 | REDACT-01 | — | Runs unconditionally — no bypass mechanism exists (`redact(text)` takes no options argument) | design review | code review — no runtime flag/parameter to disable | N/A | ✅ green |
+| 04-01-05 | 01 | 1 | REDACT-01 | — | Documents false-negative behavior against realistic fixtures (paraphrased secrets, low-entropy passwords) — SC3 | unit (asserting the known gap) | `node --test src/redact.test.js` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -50,9 +50,9 @@ created: 2026-09-17
 
 ## Wave 0 Requirements
 
-- [ ] `src/redact.js` — does not exist yet; this phase creates it (`redact(text) -> { text, count }`)
-- [ ] `src/redact.test.js` — does not exist yet; this phase creates it (vendor patterns, entropy fallback, SHA/UUID whitelist, documented false-negative fixtures)
-- [ ] Framework install: none needed — `node:test` is built in, already used by `src/blame-util.test.js`
+- [x] `src/redact.js` — created (`redact(text) -> { text, count }`)
+- [x] `src/redact.test.js` — created (vendor patterns, entropy fallback, SHA/UUID whitelist, documented false-negative fixtures)
+- [x] Framework install: none needed — `node:test` is built in, already used by `src/blame-util.test.js`
 
 ---
 
@@ -64,11 +64,11 @@ created: 2026-09-17
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (`src/redact.js`, `src/redact.test.js`)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (`src/redact.js`, `src/redact.test.js`)
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete — 04-01-PLAN.md executed, full fixture suite (22 tests) green.
