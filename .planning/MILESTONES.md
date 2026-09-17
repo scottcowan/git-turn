@@ -1,5 +1,21 @@
 # Milestones
 
+## v0.2 Read Cache + Blame/Bisect (Shipped: 2026-09-17)
+
+**Phases completed:** 2 phases, 8 plans, 18 tasks
+
+**Key accomplishments:**
+
+- Cache-first cross-session turn enumeration, head_sha reverse index with collision reporting, real-ancestry topology ordering, and unified-diff/blame-porcelain parsers plus an untracked-file forward annotator, all in a new `src/blame-util.js` built on multi-session test fixtures.
+- `git turn blame <file>` — real `git blame --porcelain` mapped through the head_sha turn index for tracked files, with a snapshot-diff annotator fallback for untracked-only content, attributing every line across all git-turn sessions (D-01, D-02).
+- `git turn bisect <cmd>` binary-searches cross-session turn snapshots with a first-bad-index search, live per-candidate PASS/FAIL/SKIP progress, `git bisect run` exit-code semantics (0/125/128+/null), and a guaranteed worktree restore on every exit path including SIGINT/SIGTERM.
+- Pure calendar-day bucketing, data-relative density levels, activity summary stats, and a bounded Sunday-first week-column grid model for `git turn heatmap`, built and unit tested (23 tests) with zero git dependency.
+- Full `git turn heatmap` module behavior — ANSI/ASCII grid rendering with balanced resets, an activity-only summary block, and cross-session `run(args)` enumeration — built on Plan 01's pure grid model, proven by 20 new unit/integration tests (43 total in this file, 138 in the full suite).
+- `git turn heatmap` wired into the CLI dispatcher and --help text, documented in README.md/AGENTS.md against D-01 through D-04, and human-verified legible at wide/80-col/40-col terminal widths with correct NO_COLOR/FORCE_COLOR/piped behavior.
+- Fixed `git turn heatmap` to scale density levels against the rendered grid's own busiest day instead of the entire all-time turn history, closing the WR-01 gap from 03.1-VERIFICATION.md.
+
+---
+
 ## v0.1 Working CLI (Shipped: 2026-08-09)
 
 **Phases completed:** 1 phases, 6 plans, 11 tasks

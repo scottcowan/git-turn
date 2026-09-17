@@ -2,25 +2,25 @@
 gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: Read Cache + Blame/Bisect
-status: completed
-last_updated: "2026-09-17T15:49:19.000Z"
-last_activity: 2026-09-17
+status: Awaiting next milestone
+last_updated: "2026-09-17T15:54:23.612Z"
+last_activity: 2026-09-17 — Milestone v0.2 completed and archived
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 14
-  completed_plans: 14
-  percent: 100
+  total_phases: 4
+  completed_phases: 2
+  total_plans: 8
+  completed_plans: 8
+  percent: 50
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 03.1 (turn-heatmap) — Complete
-Plan: 4/4 complete (incl. one gap-closure round)
-Status: v0.2 milestone audit complete (passed) — see `.planning/v0.2-MILESTONE-AUDIT.md`
-Last activity: 2026-09-17
+Phase: Milestone v0.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-17 — Milestone v0.2 completed and archived
 
 ## Decisions
 
@@ -36,13 +36,17 @@ Last activity: 2026-09-17
 
 ## Deferred Items
 
-None currently — `sqlite-read-cache.md` (previously deferred here) shipped 2026-08-18 (`d591cff`) and was moved to `.planning/todos/completed/` on 2026-09-06.
+Items acknowledged and deferred at milestone close on 2026-09-17:
+
+| Category | Item | Status |
+|----------|------|--------|
+| uat | 03-UAT.md (Phase 03) | resolved, 0 pending scenarios — audit tool false-positive flag |
+| todo | 2026-09-06-secret-redaction-on-notes.md | pending, folded into Phase 4 as locked requirement |
+| todo | 2026-09-07-rich-diff-renderer.md | pending, optional enhancement over shipped color-diff |
 
 ## Operator Next Steps
 
-- Run `/gsd-complete-milestone 0.2` to archive v0.2 — audit passed 2026-09-17 (see `.planning/v0.2-MILESTONE-AUDIT.md`).
-- Unrelated, lower priority: `.planning/todos/pending/2026-09-07-rich-diff-renderer.md` — richer full-line-highlight diff style, not blocking milestone close.
-- Unrelated, lower priority: `.planning/todos/pending/2026-09-06-secret-redaction-on-notes.md` — folded into Phase 4, build when Phase 4 is planned.
+- Start the next milestone with /gsd-new-milestone
 
 ## Accumulated Context
 
