@@ -64,13 +64,17 @@ describe('redact — vendor pattern coverage (D-02: all 9 categories)', () => {
       '-----END RSA PRIVATE KEY-----',
     ].join('\n');
     const { text, count } = redact(pem);
-    assert.equal(count, 1);
-    assert.ok(text.includes('[REDACTED]'));
     // Documented behavior (see 04-RESEARCH.md Pitfall 3): the header line
     // pattern only matches the header itself; the base64 body below it is
-    // NOT separately pattern-matched (it may still be caught by the
-    // entropy fallback if a body line clears the 20-char/4.5-bit floor —
-    // that is incidental, not guaranteed, and is not asserted here).
+    // NOT separately pattern-matched by the vendor pass — it may still be
+    // caught by the entropy fallback if a body line clears the
+    // 20-char/4.5-bit floor. This particular fixture's body lines DO clear
+    // that floor, so count is intentionally asserted as >= 1 (header) not
+    // a fixed value — the exact body-line count is incidental to the
+    // entropy floor and must not be pinned as an implementation detail.
+    assert.ok(count >= 1);
+    assert.ok(text.includes('[REDACTED]'));
+    assert.ok(!text.includes('-----BEGIN RSA PRIVATE KEY-----'), 'PEM header must be redacted');
   });
 
   test('redacts a .env-style block with multiple secrets (SC3: .env fixture)', () => {
