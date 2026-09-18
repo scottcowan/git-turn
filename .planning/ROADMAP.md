@@ -76,7 +76,12 @@ Plans:
   3. `usage` is written in the exact Anthropic-shape schema (`input_tokens`/`output_tokens`/`cache_read_input_tokens`/`cache_creation_input_tokens`).
   4. When the caller supplies start/stop timestamps to `record-prompt`, `latency_ms` is captured on the note.
   5. A tool-call count/name summary can be attached to the note alongside prompt metadata.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — `updateNote()` read-merge-write helper in `src/git.js` + `src/git.test.js` (merge preservation, race retry, retry exhaustion)
+- [ ] 05-02-PLAN.md — `src/cache.js` guarded `usage`/`tool_summary` migration, extended `upsertTurn()`, new `updatePromptFields()` + `src/cache.test.js`
+- [ ] 05-03-PLAN.md — `src/commands/record-prompt.js` (stdin JSON, redaction, turn-index targeting, merge write, best-effort cache) + tests, `bin/git-turn` registration, AGENTS.md refresh
 
 ### Phase 6: Verification, Redact Command & Purge Procedure
 **Goal**: Captured prompt/model/usage data renders and prices correctly end-to-end through the already-shipped read side, and there's a real remediation path for a secret that made it into a note anyway.
@@ -114,7 +119,7 @@ Plans:
 | 3. bisect + blame | v0.2 | 4/4 | Complete | 2026-09-07 |
 | 03.1. Turn heatmap | v0.2 | 4/4 | Complete | 2026-09-08 |
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
-| 5. record-prompt note-write path | v0.3 | 0/? | Not started | — |
+| 5. record-prompt note-write path | v0.3 | 0/3 | Not started | — |
 | 6. Verification, redact command & purge procedure | v0.3 | 0/? | Not started | — |
 | 7. MCP server | v0.4 | 0/? | Planned | — |
 | 8. Warren integration | v1.0 | 0/? | Planned | — |
