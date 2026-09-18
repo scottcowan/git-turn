@@ -1,8 +1,8 @@
 ---
 phase: 5
 slug: record-prompt-note-write-path
-status: draft
-nyquist_compliant: false
+status: ready
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-09-18
 ---
@@ -19,7 +19,7 @@ created: 2026-09-18
 |----------|-------|
 | **Framework** | `node:test` (Node built-in, no dependency) |
 | **Config file** | none — bare `node --test` via `npm test` script |
-| **Quick run command** | `node --test src/record-prompt.test.js` |
+| **Quick run command** | `node --test src/commands/record-prompt.test.js` |
 | **Full suite command** | `npm test` |
 | **Estimated runtime** | ~1-2 seconds |
 
@@ -27,7 +27,7 @@ created: 2026-09-18
 
 ## Sampling Rate
 
-- **After every task commit:** `node --test src/record-prompt.test.js` (and any new `src/git.test.js`/`src/cache.test.js` if the planner adds them)
+- **After every task commit:** `node --test src/git.test.js` / `node --test src/cache.test.js` / `node --test src/commands/record-prompt.test.js` (per plan)
 - **After every plan wave:** `npm test`
 - **Before `/gsd-verify-work`:** Full suite must be green
 - **Max feedback latency:** 5 seconds
@@ -38,12 +38,13 @@ created: 2026-09-18
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 05-01-01 | 01 | 1 | CAPTURE-01 | — | Merge preserves hook fields (`session_id`/`turn_n`/`snapshot_sha`/`ts`); retry-on-conflict resolves a simulated race | unit | `node --test src/record-prompt.test.js` | ❌ W0 | ⬜ pending |
-| 05-01-02 | 01 | 1 | CAPTURE-02 | T-05-02 | `usage` written verbatim in Anthropic shape; `cost.js` computes nonzero cost end-to-end | integration | `node --test src/record-prompt.test.js` | ❌ W0 | ⬜ pending |
-| 05-01-03 | 01 | 1 | CAPTURE-03 | — | `latency_ms` passed through and persisted in both note and cache | unit | `node --test src/record-prompt.test.js` | ❌ W0 | ⬜ pending |
-| 05-01-04 | 01 | 1 | CAPTURE-04 | — | `tool_summary` per-tool breakdown persisted and round-trips through JSON | unit | `node --test src/record-prompt.test.js` | ❌ W0 | ⬜ pending |
-| 05-01-05 | 01 | 1 | — | T-05-01 | Mandatory `redact()` call on `prompt` before any write; no opt-out | unit | `node --test src/record-prompt.test.js` | ❌ W0 | ⬜ pending |
-| 05-01-06 | 01 | 1 | — | T-05-03 | Malformed JSON stdin / non-object `usage` / non-string `prompt` fails loudly (stderr + exit 1), never silently coerces | unit | `node --test src/record-prompt.test.js` | ❌ W0 | ⬜ pending |
+| 05-01-01 | 01 | 1 | CAPTURE-01 | T-05-03 | RED: `updateNote()` does not exist yet | unit | `node --test src/git.test.js` | ❌ W0 | ⬜ pending |
+| 05-01-02 | 01 | 1 | CAPTURE-01 | T-05-03 | GREEN: `updateNote(ref, sha, patchFn)` bounded read-compare-retry merge helper preserves hook fields | unit | `node --test src/git.test.js` | ❌ W0 | ⬜ pending |
+| 05-02-01 | 02 | 1 | CAPTURE-02, CAPTURE-03, CAPTURE-04 | T-05-04 | RED: `usage`/`tool_summary` columns and `updatePromptFields()` do not exist yet | unit | `node --test src/cache.test.js` | ❌ W0 | ⬜ pending |
+| 05-02-02 | 02 | 1 | CAPTURE-02, CAPTURE-03, CAPTURE-04 | T-05-04 | GREEN: guarded `ALTER TABLE` migration + `updatePromptFields()` COALESCE merge persists `usage`/`latency_ms`/`tool_summary` | unit | `node --test src/cache.test.js` | ❌ W0 | ⬜ pending |
+| 05-03-01 | 03 | 2 | CAPTURE-01..04 | T-05-01, T-05-02 | `record-prompt` reads stdin JSON, redacts `prompt`, resolves target turn via `listTurns()`/`parseSnapshotMessage()` (never bare `HEAD`), merges via `updateNote()`, updates cache | unit + integration | `node --test src/commands/record-prompt.test.js` | ❌ W0 | ⬜ pending |
+| 05-03-02 | 03 | 2 | CAPTURE-02 | T-05-02 | `usage` written verbatim in Anthropic shape; note/cache round-trip asserted (deepEqual) | integration | `node --test src/commands/record-prompt.test.js` | ❌ W0 | ⬜ pending |
+| 05-03-03 | 03 | 2 | — | — | `bin/git-turn` registration + `--help`/`AGENTS.md` documentation | design review | grep gate + manual `--help` check | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -51,27 +52,27 @@ created: 2026-09-18
 
 ## Wave 0 Requirements
 
-- [ ] `src/commands/record-prompt.js` — does not exist yet; this phase creates it
-- [ ] `src/record-prompt.test.js` — new file, covers CAPTURE-01 through CAPTURE-04 plus JSON-parse-failure and non-string-prompt error paths
-- [ ] `updateNote()` in `src/git.js` — new merge-and-retry helper; planner decides whether to unit-test via a new `src/git.test.js` or colocate coverage in `record-prompt.test.js`
-- [ ] `usage TEXT`/`tool_summary TEXT` columns + `updatePromptFields()` in `src/cache.js` — migration; planner decides whether to unit-test via a new `src/cache.test.js` or colocate coverage
+- [ ] `src/commands/record-prompt.js` — does not exist yet; Plan 05-03 creates it
+- [ ] `src/commands/record-prompt.test.js` — does not exist yet; Plan 05-03 creates it (colocated with other command tests per project convention, not the standalone `src/record-prompt.test.js` path this document originally sketched)
+- [ ] `updateNote()` in `src/git.js` — does not exist yet; Plan 05-01 creates it plus a new `src/git.test.js`
+- [ ] `usage TEXT`/`tool_summary TEXT` columns + `updatePromptFields()` in `src/cache.js` — does not exist yet; Plan 05-02 creates them plus a new `src/cache.test.js`
 - [ ] Framework install: none needed — `node:test` is built in
 
 ---
 
 ## Manual-Only Verifications
 
-*None — all phase behaviors have automated verification via `src/record-prompt.test.js` (and any colocated `updateNote`/cache-migration tests).*
+*None — all phase behaviors have automated verification via `src/git.test.js`, `src/cache.test.js`, and `src/commands/record-prompt.test.js`.*
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (`src/commands/record-prompt.js`, `src/record-prompt.test.js`)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (`src/commands/record-prompt.js`, `src/commands/record-prompt.test.js`, `src/git.js`/`src/git.test.js`, `src/cache.js`/`src/cache.test.js`)
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ready for execution — plans 05-01/05-02/05-03 verified by gsd-plan-checker (2026-09-18), test paths reconciled to match final plans. Marked `wave_0_complete`/task status green only after `/gsd-execute-phase 5` actually runs.

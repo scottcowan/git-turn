@@ -495,17 +495,19 @@ try {
 | A2 | `record-prompt` invocation frequency/timing means the note read-write race window is sub-millisecond and acceptable without a real lock | Focus Q1 | LOW-MEDIUM — if a future automation pattern calls `record-prompt` in tight loops or concurrently across multiple processes, the bounded-retry approach could still lose data after exhausting retries; mitigated by the throw-on-exhaustion behavior (loud failure, not silent data loss) |
 | A3 | Usage partial-fill across multiple `record-prompt` calls (e.g. `input_tokens` in one call, `output_tokens` in a later call) should merge at the whole-`usage`-object level, not per-sub-field | Focus Q4/Q6 | LOW — D-03 explicitly covers top-level field merge; sub-field merging inside `usage` itself was not explicitly locked in CONTEXT.md. If a caller sends partial `usage` across two calls expecting field-level merge, the second call's `usage` object will fully replace the first's (whole-object semantics, matching how the rest of the merge works) rather than deep-merging — flag for planner/user confirmation if incremental usage capture is a real expected caller pattern |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `usage` need field-level (deep) merge across multiple `record-prompt` calls, or is whole-object replacement (matching every other field) sufficient?**
    - What we know: D-03 locks whole-field merge semantics ("adds/overwrites only the fields it provides"); it does not explicitly address sub-fields of a single field like `usage`.
    - What's unclear: Whether the hook-wrapper's future usage pattern will ever send `usage` in two separate calls with different sub-fields populated.
    - Recommendation: Implement whole-object replacement for `usage` (matches the rest of the merge model, simplest to reason about); document this explicitly so a future phase doesn't assume deep-merge silently.
+   - **RESOLVED:** Whole-object replacement, implemented in Plan 05-02 Task 2's `updatePromptFields()`/COALESCE merge (see 05-02-PLAN.md Task 2 action).
 
 2. **Should `record-prompt` print which fields were newly added vs. overwritten (vs. just "recorded: prompt, model")?**
    - What we know: `AGENTS.md` mandates plain-text stdout, no `--json`.
    - What's unclear: How much detail the confirmation line should carry — CONTEXT.md doesn't specify exact output text.
    - Recommendation: Planner's discretion; keep it a single line, low-noise, consistent with `redacted N secret(s)` on stderr (Focus Q5) plus a plain confirmation on stdout.
+   - **RESOLVED:** Single-line low-noise confirmation, exact wording specified in Plan 05-03 Task 2's action.
 
 ## Validation Architecture
 
