@@ -35,6 +35,7 @@ describe('record-prompt command', () => {
     const origLog = console.log;
     const origErr = console.error;
     const origExit = process.exit;
+    const origStderrWrite = process.stderr.write;
 
     const out = [];
     const err = [];
@@ -50,6 +51,7 @@ describe('record-prompt command', () => {
     };
     console.log = (...args) => out.push(args.join(' '));
     console.error = (...args) => err.push(args.join(' '));
+    process.stderr.write = (chunk) => { err.push(String(chunk)); return true; };
     process.exit = (code) => { throw new Error('EXIT:' + code); };
 
     try {
@@ -66,6 +68,7 @@ describe('record-prompt command', () => {
       fsMod.readFileSync = origRead;
       console.log = origLog;
       console.error = origErr;
+      process.stderr.write = origStderrWrite;
       process.exit = origExit;
     }
 
