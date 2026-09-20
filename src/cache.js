@@ -18,6 +18,26 @@ function cacheDbPath() {
 
 let _db = null;
 
+// Schema migrations that upgrade an existing database in place. New columns
+// go here as guarded ALTER TABLE statements rather than in the CREATE TABLE
+// block above, so pre-v0.3 databases upgrade in place instead of needing a
+// destructive rebuild. Each ALTER is idempotent: a "duplicate column name"
+// error means a prior process already applied it, which is safe to ignore.
+// Any other SQL error indicates a genuinely broken schema and must surface.
+function migrateSchema(db) {
+  const migrations = [
+    'ALTER TABLE turns ADD COLUMN usage TEXT',
+    'ALTER TABLE turns ADD COLUMN tool_summary TEXT',
+  ];
+  for (const sql of migrations) {
+    try {
+      db.exec(sql);
+    } catch (e) {
+      if (!/duplicate column name/i.test(e.message)) throw e;
+    }
+  }
+}
+
 function openDb() {
   if (_db) return _db;
   const dbPath = cacheDbPath();
@@ -51,6 +71,7 @@ function openDb() {
     CREATE INDEX IF NOT EXISTS idx_turn_files_path ON turn_files(file_path);
     CREATE INDEX IF NOT EXISTS idx_turn_files_turn ON turn_files(turn_id);
   `);
+  migrateSchema(_db);
   return _db;
 }
 
@@ -65,6 +86,8 @@ function upsertTurn(db, { sessionId, turnN, snapshotSha, headSha, branch, ts, me
   const prompt = meta?.prompt || null;
   const model = meta?.model || null;
   const latency_ms = meta?.latency_ms || null;
+  const usage = meta?.usage ? JSON.stringify(meta.usage) : null;
+  const tool_summary = meta?.tool_summary ? JSON.stringify(meta.tool_summary) : null;
 
   // Diff stats vs prior snapshot (or vs empty tree for turn 1)
   const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -88,8 +111,9 @@ function upsertTurn(db, { sessionId, turnN, snapshotSha, headSha, branch, ts, me
 
   const upsert = db.prepare(`
     INSERT INTO turns (session_id, turn_n, snapshot_sha, head_sha, branch, ts,
-                       files_changed, insertions, deletions, prompt, model, latency_ms)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       files_changed, insertions, deletions, prompt, model, latency_ms,
+                       usage, tool_summary)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(session_id, turn_n) DO UPDATE SET
       snapshot_sha  = excluded.snapshot_sha,
       head_sha      = excluded.head_sha,
@@ -100,10 +124,13 @@ function upsertTurn(db, { sessionId, turnN, snapshotSha, headSha, branch, ts, me
       deletions     = excluded.deletions,
       prompt        = excluded.prompt,
       model         = excluded.model,
-      latency_ms    = excluded.latency_ms
+      latency_ms    = excluded.latency_ms,
+      usage         = excluded.usage,
+      tool_summary  = excluded.tool_summary
   `);
   upsert.run(sessionId, turnN, snapshotSha, headSha || null, branch || null, ts,
-             filesChanged, totalIns, totalDel, prompt, model, latency_ms);
+             filesChanged, totalIns, totalDel, prompt, model, latency_ms,
+             usage, tool_summary);
 
   const turnId = db.prepare('SELECT id FROM turns WHERE session_id=? AND turn_n=?')
                    .get(sessionId, turnN)?.id;
@@ -203,6 +230,36 @@ function insertTurn({ sessionId, turnN, snapshotSha, headSha, branch, ts, meta, 
   upsertTurn(db, { sessionId, turnN, snapshotSha, headSha, branch, ts, meta, prevSnapshotSha });
 }
 
+// Best-effort metadata-only update for a single turn row, called by
+// record-prompt after the note itself has already been written. Only the
+// fields that are supplied (non-null) are overwritten; COALESCE(?, column)
+// is what implements D-03's merge-not-overwrite contract at the SQL layer,
+// mirroring updateNote()'s note-level merge. usage is replaced as a whole
+// object rather than deep-merged (05-RESEARCH.md Open Question 1, resolved
+// as whole-object replacement). Deliberately does NOT recompute
+// numstat/turn_files — unlike upsertTurn, this never touches diff stats.
+function updatePromptFields(sessionId, turnN, { prompt, model, latencyMs, usage, toolSummary } = {}) {
+  const db = openDb();
+  const stmt = db.prepare(`
+    UPDATE turns SET
+      prompt       = COALESCE(?, prompt),
+      model        = COALESCE(?, model),
+      latency_ms   = COALESCE(?, latency_ms),
+      usage        = COALESCE(?, usage),
+      tool_summary = COALESCE(?, tool_summary)
+    WHERE session_id = ? AND turn_n = ?
+  `);
+  stmt.run(
+    prompt ?? null,
+    model ?? null,
+    latencyMs ?? null,
+    usage ? JSON.stringify(usage) : null,
+    toolSummary ? JSON.stringify(toolSummary) : null,
+    sessionId,
+    turnN
+  );
+}
+
 // Query turns for a session, ordered by turn_n.
 function getTurns(sessionId) {
   const db = ensureCache();
@@ -234,4 +291,4 @@ function getTurnsForFile(filePath) {
   `).all(filePath);
 }
 
-module.exports = { openDb, closeDb, rebuild, ensureCache, insertTurn, getTurns, getAllTurns, getTurnFiles, getTurnsForFile };
+module.exports = { openDb, closeDb, rebuild, ensureCache, insertTurn, updatePromptFields, getTurns, getAllTurns, getTurnFiles, getTurnsForFile };
