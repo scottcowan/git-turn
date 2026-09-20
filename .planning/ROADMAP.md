@@ -39,7 +39,7 @@ Archive: `.planning/milestones/v0.2-ROADMAP.md`, audit: `.planning/milestones/v0
 **Milestone Goal:** Persist prompt/model/latency/usage metadata per turn, safely — with mandatory secret redaction on the write path and end-to-end verification against real data.
 
 - [x] **Phase 4: Secret Redaction Scanner** - Vendored regex + entropy scanner that redacts likely secrets in free-text content before it can reach a note (completed 2026-09-17)
-- [ ] **Phase 5: record-prompt Note-Write Path** - `git turn record-prompt` attaches prompt/model/usage/latency/tool-summary metadata to a turn's note via safe read-merge-write
+- [x] **Phase 5: record-prompt Note-Write Path** - `git turn record-prompt` attaches prompt/model/usage/latency/tool-summary metadata to a turn's note via safe read-merge-write (completed 2026-09-20)
 - [ ] **Phase 6: Verification, Redact Command & Purge Procedure** - `--with-prompts`/`cost` proven against real captured data, plus `redact <N>` and a documented purge procedure for already-written secrets
 
 ### 📋 v0.4 MCP Server (Phase 7)
@@ -93,7 +93,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 05-03-PLAN.md — `src/commands/record-prompt.js` (stdin JSON, redaction, turn-index targeting, merge write, best-effort cache) + tests, `bin/git-turn` registration, AGENTS.md refresh
+- [x] 05-03-PLAN.md — `src/commands/record-prompt.js` (stdin JSON, redaction, turn-index targeting, merge write, best-effort cache) + tests, `bin/git-turn` registration, AGENTS.md refresh
 
 ### Phase 6: Verification, Redact Command & Purge Procedure
 
@@ -140,7 +140,7 @@ Plans:
 | 3. bisect + blame | v0.2 | 4/4 | Complete | 2026-09-07 |
 | 03.1. Turn heatmap | v0.2 | 4/4 | Complete | 2026-09-08 |
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
-| 5. record-prompt note-write path | v0.3 | 2/3 | In Progress|  |
+| 5. record-prompt note-write path | v0.3 | 3/3 | Complete   | 2026-09-20 |
 | 6. Verification, redact command & purge procedure | v0.3 | 0/? | Not started | — |
 | 7. MCP server | v0.4 | 0/? | Planned | — |
 | 8. Warren integration | v1.0 | 0/? | Planned | — |
