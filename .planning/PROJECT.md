@@ -14,7 +14,7 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 - **Refs** — `refs/git-turn/sessions/{id}/turn-{N}` point at dangling snapshot commits
 - **Snapshots** — dangling `commit-tree` commits with two trees: index state + full worktree (including untracked)
-- **Notes** — `refs/notes/git-turn` stores `{session_id, turn_n, snapshot_sha, ts}` per turn on the HEAD commit. `prompt`/`model`/`latency_ms`/`usage` are read defensively where present but nothing shipped writes them yet (Phase 4, not built).
+- **Notes** — `refs/notes/git-turn` stores `{session_id, turn_n, snapshot_sha, ts}` per turn on the HEAD commit, plus `prompt`/`model`/`usage`/`latency_ms`/`tool_summary` once `git turn record-prompt` (Phase 5) is run — merged via `updateNote()`'s read-merge-write helper, never a blind overwrite
 - **Session meta** — `refs/git-turn/sessions/{id}/meta` durable per-session metadata (fork lineage via `session new --from`), survives after the session is no longer active
 - **Op log** — `.git/git-turn/ops/` content-addressed operation log (jj-style) for undo/redo
 - **SQLite cache** — shipped (`src/cache.js`, `d591cff`) — read cache for fast `log`/`cost` reads, rebuilt via `gc --rebuild` or automatically if stale
@@ -35,9 +35,11 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 14 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`, `heatmap`. Full test suite (145 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
 
-**Not yet implemented:** `branch --from <N>` (Phase 6, blocked on the Warren API). `record-prompt` write path (Phase 5) and MCP server (Phase 7, v0.4) — planned.
+**Not yet implemented:** `branch --from <N>` (Phase 6 of v1.0, blocked on the Warren API). `git turn redact <N>` post-hoc scrub, purge remediation procedure, and end-to-end `--with-prompts`/`cost` verification — Phase 6 of v0.3, planned.
 
-**Phase 4 complete (2026-09-17):** `src/redact.js` — a standalone, zero-dependency secret scanner (`redact(text) -> { text, count }`) covering 9 vendor-prefixed categories (AWS, GitHub, OpenAI, Anthropic, Slack, Google, Stripe, PEM, generic key=value) plus a Shannon-entropy fallback for unstructured tokens, with a SHA/UUID whitelist to avoid false-positive redaction of legitimate git identifiers. Validated against realistic fixtures (22 tests) with documented false-negative behavior. Not yet wired into any note-write path — that's Phase 5.
+**Phase 4 complete (2026-09-17):** `src/redact.js` — a standalone, zero-dependency secret scanner (`redact(text) -> { text, count }`) covering 9 vendor-prefixed categories (AWS, GitHub, OpenAI, Anthropic, Slack, Google, Stripe, PEM, generic key=value) plus a Shannon-entropy fallback for unstructured tokens, with a SHA/UUID whitelist to avoid false-positive redaction of legitimate git identifiers. Validated against realistic fixtures (22 tests) with documented false-negative behavior.
+
+**Phase 5 complete (2026-09-20):** `git turn record-prompt` — reads a JSON payload on stdin (`{prompt, model, usage, latency_ms, tool_summary}`, all optional), redacts `prompt` through Phase 4's scanner, resolves the latest turn via `listTurns()`/`parseSnapshotMessage()` (never bare `HEAD`), and merges into the note via a new `updateNote(ref, sha, patchFn)` read-compare-retry helper in `src/git.js` (never a blind overwrite of the hook's fields). `usage` is stored verbatim in Anthropic's four-key shape; `tool_summary` is a per-tool call-count breakdown. SQLite cache extended with `usage`/`tool_summary` columns and a narrow `updatePromptFields()` writer. 26 new tests; 3 code-review warnings found and fixed same-phase (type validation on `model`/`tool_summary`, stderr diagnostic on cache-write failure, `??` vs `||` for zero-valued fields).
 
 **Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (rich diff renderer, an optional enhancement; mindwalk integration exploration).
 
@@ -46,10 +48,10 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 **Goal:** Persist prompt/model/latency/usage metadata per turn, safely.
 
 **Target features:**
-- `git turn record-prompt` — attach prompt/response metadata to the current turn's note (Phase 5, in progress)
-- Note payload gains `prompt`/`model`/`latency_ms`/`usage` fields (currently read defensively, never written)
-- Secret redaction built into the write path from day one — ✓ shipped in Phase 4 (`src/redact.js`), not yet wired into a writer
-- `--with-prompts` flag on `log`/`show` to surface captured prompt content
+- `git turn record-prompt` — ✓ shipped in Phase 5, attaches prompt/response metadata to the current turn's note
+- Note payload gains `prompt`/`model`/`latency_ms`/`usage`/`tool_summary` fields — ✓ shipped, `log`/`show --with-prompts` and `cost` can now receive real data
+- Secret redaction built into the write path from day one — ✓ shipped in Phase 4 (`src/redact.js`), ✓ wired into `record-prompt` in Phase 5
+- `--with-prompts` flag on `log`/`show` to surface captured prompt content — reader side already existed pre-milestone; end-to-end verification against real data is Phase 6
 
 MCP server (Claude Code addon) deferred to a later milestone — out of scope for v0.3.
 
@@ -77,4 +79,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-17 after Phase 4 (secret redaction scanner) completion*
+*Last updated: 2026-09-20 after Phase 5 (record-prompt note-write path) completion*
