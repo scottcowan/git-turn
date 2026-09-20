@@ -5,7 +5,7 @@ const { execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const COMMANDS = ['init', 'log', 'show', 'diff', 'blame', 'bisect', 'heatmap', 'revert', 'redo', 'branch', 'status', 'gc', 'session', 'cost', 'export'];
+const COMMANDS = ['init', 'log', 'show', 'diff', 'blame', 'bisect', 'heatmap', 'revert', 'redo', 'branch', 'status', 'gc', 'session', 'cost', 'export', 'record-prompt'];
 
 const [,, cmd, ...args] = process.argv;
 
@@ -27,6 +27,7 @@ Commands:
   gc [--keep-sessions N]  Prune old session refs
   session new|list        Manage sessions
   cost                    Show token usage and cost for current session
+  record-prompt           Attach prompt/model/usage/latency metadata to the latest turn (JSON on stdin)
   export [--since <ref>] [--output <path>]  Bundle git-turn refs for handoff to another repo
 `);
   process.exit(0);
