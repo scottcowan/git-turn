@@ -83,9 +83,9 @@ function closeDb() {
 // a git diff --numstat against the prior snapshot.
 function upsertTurn(db, { sessionId, turnN, snapshotSha, headSha, branch, ts, meta, prevSnapshotSha }) {
   // Parse note metadata
-  const prompt = meta?.prompt || null;
-  const model = meta?.model || null;
-  const latency_ms = meta?.latency_ms || null;
+  const prompt = meta?.prompt ?? null;
+  const model = meta?.model ?? null;
+  const latency_ms = meta?.latency_ms ?? null;
   const usage = meta?.usage ? JSON.stringify(meta.usage) : null;
   const tool_summary = meta?.tool_summary ? JSON.stringify(meta.tool_summary) : null;
 
