@@ -184,10 +184,38 @@ function getNote(ref, commitSha) {
   return gitSafe(['notes', `--ref=${ref}`, 'show', commitSha]);
 }
 
+// Read-merge-write a git note. patchFn must be pure and side-effect-free
+// because it may run more than once on retry. The retry detects a
+// content-level clobber (git notes add -f never reports a conflict) by
+// re-reading the note immediately before writing; a residual sub-millisecond
+// TOCTOU gap between that re-read and the write is deliberately accepted per
+// 05-RESEARCH.md rather than adding a lock file.
+function updateNote(ref, commitSha, patchFn, { maxRetries = 3 } = {}) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const before = getNote(ref, commitSha);
+    let existing = {};
+    if (before) {
+      try { existing = JSON.parse(before); } catch { existing = {}; }
+    }
+    const patched = patchFn(existing);
+    const patchedJSON = JSON.stringify(patched);
+
+    const justBeforeWrite = getNote(ref, commitSha);
+    if (justBeforeWrite !== before) {
+      if (attempt === maxRetries) {
+        throw new Error(`updateNote: note for ${commitSha} changed concurrently, giving up after ${maxRetries} retries`);
+      }
+      continue;
+    }
+    addNote(ref, commitSha, patchedJSON);
+    return patched;
+  }
+}
+
 module.exports = {
   git, gitSafe, repoRoot, gitDir, hooksDir, headSha, currentBranch, shouldColor,
   updateRef, deleteRef, listRefs,
   snapshotWorktree, restoreSnapshot,
   writeBlob, readBlob,
-  addNote, getNote,
+  addNote, getNote, updateNote,
 };
