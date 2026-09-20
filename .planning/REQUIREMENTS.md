@@ -4,10 +4,10 @@
 
 ### Capture
 
-- [ ] **CAPTURE-01**: `git turn record-prompt` attaches prompt/model/usage/latency metadata to the current turn's note without clobbering the post-commit hook's existing fields (`session_id`/`turn_n`/`snapshot_sha`/`ts`) — read-merge-write with retry-on-conflict, target commit resolved via the turn index (`listTurns()`/`parseSnapshotMessage()`), never bare `HEAD`
-- [ ] **CAPTURE-02**: `usage` is written in the exact Anthropic-shape schema (`input_tokens`/`output_tokens`/`cache_read_input_tokens`/`cache_creation_input_tokens`) so `git turn cost` computes real costs instead of silently showing `$0.00`
-- [ ] **CAPTURE-03**: `latency_ms` is captured when the caller supplies start/stop timestamps to `record-prompt`
-- [ ] **CAPTURE-04**: A tool-call count/name summary can be attached alongside prompt metadata
+- [x] **CAPTURE-01**: `git turn record-prompt` attaches prompt/model/usage/latency metadata to the current turn's note without clobbering the post-commit hook's existing fields (`session_id`/`turn_n`/`snapshot_sha`/`ts`) — read-merge-write with retry-on-conflict, target commit resolved via the turn index (`listTurns()`/`parseSnapshotMessage()`), never bare `HEAD`
+- [x] **CAPTURE-02**: `usage` is written in the exact Anthropic-shape schema (`input_tokens`/`output_tokens`/`cache_read_input_tokens`/`cache_creation_input_tokens`) so `git turn cost` computes real costs instead of silently showing `$0.00`
+- [x] **CAPTURE-03**: `latency_ms` is captured when the caller supplies start/stop timestamps to `record-prompt`
+- [x] **CAPTURE-04**: A tool-call count/name summary can be attached alongside prompt metadata
 
 ### Redaction
 
@@ -35,10 +35,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAPTURE-01 | Phase 5 | Pending |
-| CAPTURE-02 | Phase 5 | Pending |
-| CAPTURE-03 | Phase 5 | Pending |
-| CAPTURE-04 | Phase 5 | Pending |
+| CAPTURE-01 | Phase 5 | Complete |
+| CAPTURE-02 | Phase 5 | Complete |
+| CAPTURE-03 | Phase 5 | Complete |
+| CAPTURE-04 | Phase 5 | Complete |
 | REDACT-01 | Phase 4 | Complete |
 | REDACT-02 | Phase 6 | Pending |
 | REDACT-03 | Phase 6 | Pending |

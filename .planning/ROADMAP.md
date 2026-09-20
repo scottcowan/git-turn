@@ -140,7 +140,7 @@ Plans:
 | 3. bisect + blame | v0.2 | 4/4 | Complete | 2026-09-07 |
 | 03.1. Turn heatmap | v0.2 | 4/4 | Complete | 2026-09-08 |
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
-| 5. record-prompt note-write path | v0.3 | 3/3 | Complete   | 2026-09-20 |
+| 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
 | 6. Verification, redact command & purge procedure | v0.3 | 0/? | Not started | — |
 | 7. MCP server | v0.4 | 0/? | Planned | — |
 | 8. Warren integration | v1.0 | 0/? | Planned | — |

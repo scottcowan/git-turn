@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: Prompt Capture
-status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-09-20T22:17:27.944Z"
+status: ready_to_plan
+stopped_at: Phase 5 complete (3/3) — ready to discuss Phase 6
+last_updated: 2026-09-20T23:09:48.873Z
 last_activity: 2026-09-20 -- Phase 5 execution started
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 18
   percent: 20
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** Know exactly which agent turn broke your code — diff, blame, bisect, and revert at turn granularity.
-**Current focus:** Phase 5 — record-prompt-note-write-path
+**Current focus:** Phase 6 — verification, redact command & purge procedure
 
 ## Current Position
 
-Phase: 5 (record-prompt-note-write-path) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 5
-Last activity: 2026-09-20 -- Phase 5 execution started
+Phase: 6
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-20
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -36,7 +36,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 1 (this milestone)
+- Total plans completed: 4 (this milestone)
 - Average duration: n/a
 - Total execution time: n/a
 
@@ -45,6 +45,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 4 | 1 | - | - |
+| 5 | 3 | - | - |
 
 **Recent Trend:**
 
