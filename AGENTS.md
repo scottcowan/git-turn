@@ -38,6 +38,15 @@ Current session ID, turn count, and hook health (whether the post-commit hook is
 ### `git turn cost [--all]`
 Token usage and estimated $ cost for the current session, computed from captured usage metadata and fetched LiteLLM pricing. `--all` reports across all sessions, not just the current one.
 
+### `git turn record-prompt`
+Reads one JSON object on stdin — `{ prompt, model, usage, latency_ms, tool_summary }`, all fields optional — and merges the supplied fields into the latest turn of the current session's note. Always targets the latest turn (no `--turn N` flag); the target is resolved via the turn index, never bare `HEAD`. Merges rather than overwrites, so repeat calls accumulate and the post-commit hook's `session_id`/`turn_n`/`snapshot_sha`/`ts` fields are always preserved. Unconditionally redacts secrets found in `prompt` — there is no opt-out flag — and reports a redaction count on stderr. `usage` is expected in Anthropic's shape (`input_tokens`/`output_tokens`/`cache_read_input_tokens`/`cache_creation_input_tokens`) so `git turn cost` can price it; `tool_summary` is a tool-name-to-count object, e.g. `{"Read": 5, "Edit": 2, "Bash": 1}`. Fails with `git turn: <message>` on stderr and exit 1 on malformed JSON, a non-string `prompt`, a non-object `usage`, empty stdin, or a session with no turns yet. Example:
+
+```sh
+echo '{"prompt":"why did this break","model":"claude-sonnet-4-5","usage":{"input_tokens":1200,"output_tokens":340}}' | git turn record-prompt
+```
+
+No wrapper or hook ships yet that constructs this payload automatically — the caller is the operator or a future Claude Code Stop-hook.
+
 ### `git turn revert <N>`
 Restores the worktree to the exact state captured at turn `N` (destructive to uncommitted state — check `git status` first). Logs the operation so it can be undone.
 
@@ -64,7 +73,7 @@ Bundles just the git-turn ref namespace (`refs/git-turn/sessions/**`, `refs/note
 
 - `refs/git-turn/sessions/{id}/turn-{N}` — snapshot refs, one per turn
 - `refs/git-turn/sessions/{id}/meta` — durable per-session metadata blob (`{session_id, started, branch, forked_from}`); unlike `session.json`, this persists after the session is no longer active, so `session list` can always show fork lineage
-- `refs/notes/git-turn` — per-commit metadata; shipped payload is `{session_id, turn_n, snapshot_sha, ts}` (`src/hooks/post-commit.js`). `prompt`/`model`/`latency_ms`/`usage` are read defensively where present (`cache.js`, `cost.js`) but nothing shipped writes them yet — that's Phase 4 (prompt capture), not built. **Overwritten in place** on each turn, not appended — prior values only survive in the notes-ref commit history (`git log refs/notes/git-turn`)
+- `refs/notes/git-turn` — per-commit metadata; the post-commit hook writes `{session_id, turn_n, snapshot_sha, ts}` via `git notes add -f` (`src/hooks/post-commit.js`). `prompt`/`model`/`latency_ms`/`usage`/`tool_summary` are written by `git turn record-prompt` via read-merge-write (`updateNote()` in `src/git.js`) — never a blind overwrite for that path, so the hook's own fields survive every `record-prompt` call. **Overwritten in place** on each turn, not appended — prior values only survive in the notes-ref commit history (`git log refs/notes/git-turn`)
 - `refs/git-turn/format` — a discovery blob (JSON: version, tool, schema, ref_pattern, notes_ref) so other tooling can detect git-turn without guessing ref layout
 - `.git/git-turn/ops/` — revert/redo operation log
 - SQLite read cache (Node 22+, `node:sqlite`) mirrors refs/notes for fast `log`/`cost` reads; rebuilt via `gc --rebuild` or automatically if stale
