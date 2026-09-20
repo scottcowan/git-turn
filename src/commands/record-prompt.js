@@ -69,6 +69,18 @@ function run(args) {
     }
   }
 
+  if (payload.model !== undefined && typeof payload.model !== 'string') {
+    console.error('git turn: model must be a string');
+    process.exit(1);
+  }
+
+  if (payload.tool_summary !== undefined) {
+    if (payload.tool_summary === null || typeof payload.tool_summary !== 'object' || Array.isArray(payload.tool_summary)) {
+      console.error('git turn: tool_summary must be a JSON object');
+      process.exit(1);
+    }
+  }
+
   const turns = listTurns(session.session_id);
   if (turns.length === 0) {
     console.error('git turn: no turns yet this session. Make a commit first.');
@@ -99,7 +111,9 @@ function run(args) {
       usage: payload.usage,
       toolSummary: payload.tool_summary,
     });
-  } catch {}
+  } catch (e) {
+    process.stderr.write(`git turn: warning: cache update failed (${e.message})\n`);
+  }
 
   console.log(`Turn ${latest.turn_n}: recorded ${Object.keys(payload).join(', ')}`);
 }
