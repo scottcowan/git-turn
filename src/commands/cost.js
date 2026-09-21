@@ -53,7 +53,7 @@ function lookupPrice(pricing, model) {
   ];
   for (const key of candidates) {
     const entry = pricing[key];
-    if (entry && entry.input_cost_per_token) {
+    if (entry && entry.input_cost_per_token != null && entry.output_cost_per_token != null) {
       return {
         input_per_mtok: entry.input_cost_per_token * 1_000_000,
         output_per_mtok: entry.output_cost_per_token * 1_000_000,
