@@ -49,14 +49,14 @@ function run(args) {
   }
 
   for (const { turn_n, sha } of turns) {
-    const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', sha], { stdio: ['pipe', 'pipe', 'ignore'] });
-    let meta = {};
-    try { meta = note ? JSON.parse(note) : {}; } catch {}
-
     // Real HEAD sha lives in the snapshot commit's own message body, not
     // notes — refs/notes/git-turn has never carried a `head` field.
     const { headSha } = parseSnapshotMessage(sha);
     const head = headSha || sha;
+
+    const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', head], { stdio: ['pipe', 'pipe', 'ignore'] });
+    let meta = {};
+    try { meta = note ? JSON.parse(note) : {}; } catch {}
 
     const msg = gitSafe(['log', '-1', '--format=%s', head]) || '';
     const stat = gitSafe(['diff', '--shortstat', `${sha}^..${sha}`]) || '';
