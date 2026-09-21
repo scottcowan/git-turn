@@ -12,13 +12,13 @@
 ### Redaction
 
 - [x] **REDACT-01**: All prompt/response content is scanned for secrets (curated vendor-prefix regexes + Shannon-entropy fallback) and redacted before any note write — unconditional, no opt-out flag
-- [ ] **REDACT-02**: `git turn redact <N>` lets a user manually scrub a specific turn's note content after the fact
-- [ ] **REDACT-03**: A documented purge procedure (reflog-expire + `gc --prune=now` scoped to `refs/notes/git-turn`) exists for removing already-written secret blobs, since neither `git filter-repo` nor BFG cover this ref namespace
+- [x] **REDACT-02**: `git turn redact <N>` lets a user manually scrub a specific turn's note content after the fact
+- [x] **REDACT-03**: A documented purge procedure (reflog-expire + `gc --prune=now` scoped to `refs/notes/git-turn`) exists for removing already-written secret blobs, since neither `git filter-repo` nor BFG cover this ref namespace
 
 ### Verification
 
-- [ ] **VERIFY-01**: `git turn log --with-prompts` and `git turn show --with-prompts` render real captured prompt/model/latency data end-to-end (not just unit-tested in isolation)
-- [ ] **VERIFY-02**: `git turn cost` computes correct dollar costs from real captured `usage` data end-to-end
+- [x] **VERIFY-01**: `git turn log --with-prompts` and `git turn show --with-prompts` render real captured prompt/model/latency data end-to-end (not just unit-tested in isolation)
+- [x] **VERIFY-02**: `git turn cost` computes correct dollar costs from real captured `usage` data end-to-end
 
 ## Future Requirements
 
@@ -40,9 +40,9 @@
 | CAPTURE-03 | Phase 5 | Complete |
 | CAPTURE-04 | Phase 5 | Complete |
 | REDACT-01 | Phase 4 | Complete |
-| REDACT-02 | Phase 6 | Pending |
-| REDACT-03 | Phase 6 | Pending |
-| VERIFY-01 | Phase 6 | Pending |
-| VERIFY-02 | Phase 6 | Pending |
+| REDACT-02 | Phase 6 | Complete |
+| REDACT-03 | Phase 6 | Complete |
+| VERIFY-01 | Phase 6 | Complete |
+| VERIFY-02 | Phase 6 | Complete |
 
 Coverage: 9/9 v1 requirements mapped.
