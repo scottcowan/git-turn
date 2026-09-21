@@ -41,7 +41,7 @@ created: 2026-09-21
 | 06-01-01 | 01 | 1 | VERIFY-01 | — | `show <N>`/`show <N> --with-prompts` resolve notes via real HEAD sha (not snapshot sha), render real prompt/model/latency after a real `record-prompt` call | integration | `node --test src/commands/show.test.js` | ❌ W0 | ⬜ pending |
 | 06-01-02 | 01 | 1 | VERIFY-01 | — | `log --with-prompts` (both cache and `--no-cache` paths) render real prompt data | integration | `node --test src/commands/log.test.js` | ❌ W0 | ⬜ pending |
 | 06-02-01 | 02 | 1 | VERIFY-02 | — | `cost` computes a correct nonzero dollar cost from real `usage`, using a network-free pricing fixture (HOME-scoped cache seed) | integration | `node --test src/commands/cost.test.js` | ❌ W0 | ⬜ pending |
-| 06-03-01 | 03 | 2 | REDACT-02 | T-06-03 | `redact <N>` clears `prompt` (resolved via correct sha), leaves model/usage/latency_ms/tool_summary intact, no-ops when there's no prompt | unit/integration | `node --test src/commands/redact.test.js` | ❌ W0 | ⬜ pending |
+| 06-03-01 | 03 | 1 | REDACT-02 | T-06-03 | `redact <N>` clears `prompt` (resolved via correct sha), leaves model/usage/latency_ms/tool_summary intact, no-ops when there's no prompt | unit/integration | `node --test src/commands/redact.test.js` | ❌ W0 | ⬜ pending |
 | 06-04-01 | 04 | 2 | REDACT-03 | T-06-01, T-06-02 | `gc --purge-notes` collapses notes history then reflog-expire + prune actually removes the old blob — object-store-level assertion (`git cat-file -e` fails on old blob sha) | integration | `node --test src/git.test.js` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
