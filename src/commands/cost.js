@@ -6,6 +6,7 @@ const path = require('path');
 const os = require('os');
 const { gitDir, gitSafe } = require('../git');
 const { readSession, listTurns, NOTES_REF } = require('../session');
+const { parseSnapshotMessage } = require('../blame-util');
 
 const PRICING_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -112,7 +113,9 @@ async function run(args) {
   console.log(`  ${'-'.repeat(5)}  ${'-'.repeat(30)}  ${'-'.repeat(8)}  ${'-'.repeat(8)}  ${'-'.repeat(10)}`);
 
   for (const { turn_n, sha } of turns) {
-    const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', sha], { stdio: ['pipe', 'pipe', 'ignore'] });
+    const { headSha } = parseSnapshotMessage(sha);
+    const head = headSha || sha;
+    const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', head], { stdio: ['pipe', 'pipe', 'ignore'] });
     let meta = {};
     try { meta = note ? JSON.parse(note) : {}; } catch {}
 
