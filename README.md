@@ -42,6 +42,8 @@ git turn heatmap                 Calendar heatmap of turn activity across all se
 git turn revert <N>              Restore worktree to turn N state
 git turn redo                    Undo the last revert
 git turn gc [--keep-sessions N]  Prune old session refs (default: keep 10)
+git turn gc --purge-notes        Permanently purge old note history from refs/notes/git-turn
+git turn redact <N>              Scrub a turn's captured prompt after the fact
 git turn cost [--all]            Token usage and estimated cost for the current (or all) sessions
 git turn session new [--from <session_id>:<turn_n>]  Start a session, optionally forked from a specific turn
 git turn session list            List every session, with turn counts and fork lineage
@@ -119,6 +121,50 @@ $ git turn export --since v1.2.0 --output handoff.bundle
 ```
 
 `export` bundles just the git-turn ref namespace (session/turn refs, the notes ref, the format blob) into a standard `git bundle` — hand it to another clone without granting access to the rest of the repo. `--since <ref>` makes it incremental, excluding everything already reachable from that ref. The receiving side pulls it in with `git fetch handoff.bundle 'refs/git-turn/*:refs/git-turn/*' 'refs/notes/git-turn:refs/notes/git-turn'` (or `git bundle unbundle`).
+
+## Remediating a leaked secret
+
+If a captured prompt (via `git turn record-prompt`) ends up containing a secret that the
+built-in scanner missed, remediation is a two-step procedure:
+
+```sh
+$ git turn redact 3
+Turn 3: prompt redacted
+Note history still contains the old blob — run `git turn gc --purge-notes` to remove it.
+
+$ git turn gc --purge-notes
+git turn gc: this permanently deletes ALL unreachable objects in this
+repository (git gc --prune=now is not scoped to notes) — including any
+dangling commits with no ref protecting them, and discards note history for
+EVERY commit's note, not just the one that leaked.
+Purged notes history for refs/notes/git-turn (old tip abc1234 -> new tip def5678).
+Old note blobs are now unreachable and have been pruned.
+```
+
+1. **`git turn redact <N>`** replaces that turn's captured `prompt` field with `[REDACTED]`,
+   leaving `model`/`usage`/`latency_ms`/`tool_summary` intact. It runs immediately with no
+   confirmation prompt. **This step is necessary but not sufficient** — the pre-redaction note
+   blob is still present and reachable in the git object store after this step alone.
+2. **`git turn gc --purge-notes`** is what actually removes the old blob. It collapses
+   `refs/notes/git-turn` to a single parentless commit holding the current (redacted) tree,
+   expires that ref's reflog, then runs `git gc --prune=now`.
+
+Three facts about this procedure were verified empirically (running real git commands against
+throwaway repos) and each contradicts what you might otherwise assume:
+
+- **Reflog expiry plus `git gc --prune=now` alone does NOT remove the old note blob.** Every
+  `git notes add -f` commits a new notes-tree commit with the previous notes commit as its
+  *parent*, so the old version stays reachable as an ordinary ancestor of the ref tip — reflog
+  expiry has no effect on ancestor reachability. The history-collapse step (a fresh, parentless
+  `commit-tree`) is what actually severs that chain and is what makes the purge work.
+- **`git gc --prune=now` is repository-wide**, not scoped to `refs/notes/git-turn`. It also
+  permanently deletes any other unreachable object in the repo not protected by a ref or reflog
+  — git provides no ref-scoped object pruning. This is unavoidable, not a bug.
+- **The purge discards note history for EVERY commit's note, not only the one that leaked.**
+  There is no way to purge one commit's note history in isolation while preserving another's.
+
+`git filter-repo` and BFG Repo-Cleaner are **not** alternatives here — neither tool has
+documented handling of the `refs/notes/*` ref namespace.
 
 ## Storage
 

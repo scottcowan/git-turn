@@ -53,8 +53,21 @@ Restores the worktree to the exact state captured at turn `N` (destructive to un
 ### `git turn redo`
 Undoes the last `revert`, restoring the worktree to its pre-revert state.
 
+### `git turn redact <N>`
+Post-hoc remediation: scrubs turn `N`'s captured `prompt` field to `[REDACTED]`, leaving `model`/`usage`/`latency_ms`/`tool_summary` intact (D-01). Runs immediately with no confirmation prompt (D-02). No-ops (prints "nothing to redact") when the turn has no captured prompt, so repeat calls don't needlessly grow the linear `refs/notes/git-turn` commit chain. **This is necessary but not sufficient** — the pre-redaction note blob is still present and reachable in the git object store afterward; every successful `redact` prints a pointer to `git turn gc --purge-notes`, which is the step that actually removes it.
+
 ### `git turn gc [--keep-sessions N] [--rebuild]`
 Prunes session refs older than the N most recent sessions (default 10). `--rebuild` forces the SQLite cache to rebuild from refs/notes instead of pruning.
+
+### `git turn gc --purge-notes`
+Permanently removes old note history from `refs/notes/git-turn` — the step that actually deletes a pre-redaction note blob after `redact <N>` has replaced its content. Sequence: collapses the ref's entire commit history to a single parentless commit holding its *current* tree, expires that ref's reflog (non-fatal if the ref has no reflog), then runs `git gc --prune=now`. Prints a loud stderr warning before running and never prompts for confirmation (D-02).
+
+Empirically verified (06-RESEARCH.md Focus Question 7) and important to understand before running:
+- Reflog expiry plus `git gc --prune=now` **alone** does not remove the old blob — `git notes add -f` always commits the new notes-tree with the previous notes commit as its *parent*, so the old version stays reachable as an ordinary ancestor of the ref tip regardless of reflog state. The history-collapse step is what actually severs that chain.
+- `git gc --prune=now` is **repository-wide**, not scoped to this one ref — it also permanently deletes any other unreachable object in the repo with no ref or reflog protecting it. Git has no ref-scoped object pruning.
+- The purge discards note history for **every** commit's note, not only the one that leaked — there is no finer-grained purge available in git's object model for this ref shape.
+
+Neither `git filter-repo` nor BFG Repo-Cleaner are alternatives — neither has documented handling of the `refs/notes/*` namespace.
 
 ### `git turn session new [--from <session_id>:<turn_n>]`
 Starts a new session. `--from` records a durable `forked_from: {session_id, turn_n}` lineage link (written to `refs/git-turn/sessions/{id}/meta`, not just the mutable `session.json`) — validates the referenced turn actually exists before creating the session. Without `--from`, behaves like the session-creation half of `init` (no hook/format-blob work, just a fresh session).
