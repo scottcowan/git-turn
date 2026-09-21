@@ -3,9 +3,10 @@
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { rmSync } = require('fs');
+const { execFileSync } = require('node:child_process');
 const { makeTestRepo } = require('../helpers/test-repo');
-const { updateRef, listRefs } = require('../git');
-const { newSession, turnRef, ensureDirs, writeSession } = require('../session');
+const { updateRef, listRefs, addNote, updateNote, headSha } = require('../git');
+const { newSession, turnRef, ensureDirs, writeSession, NOTES_REF } = require('../session');
 const crypto = require('crypto');
 
 // Epoch counter ensures distinct creatordate values across makeSessionRefs calls
@@ -149,5 +150,68 @@ describe('gc command', () => {
       !output.includes('Snapshot objects will be reclaimed'),
       'gc hint must NOT be printed when nothing is pruned'
     );
+  });
+
+  test('--purge-notes warns on stderr and purges the old note blob (REDACT-03)', () => {
+    const sha = headSha();
+    addNote(NOTES_REF, sha, JSON.stringify({ prompt: 'SECRET-MARKER' }));
+    const oldNoteCommit = execFileSync('git', ['rev-parse', NOTES_REF], { cwd: repoDir, encoding: 'utf8' }).trim();
+    updateNote(NOTES_REF, sha, existing => ({ ...existing, prompt: '[REDACTED]' }));
+
+    const logged = [];
+    const errored = [];
+    const origLog = console.log;
+    const origError = console.error;
+    console.log = (...args) => logged.push(args.join(' '));
+    console.error = (...args) => errored.push(args.join(' '));
+    try {
+      const { run } = require('./gc');
+      run(['--purge-notes']);
+    } finally {
+      console.log = origLog;
+      console.error = origError;
+    }
+
+    const out = logged.join('\n');
+    const err = errored.join('\n');
+    assert.match(out, /Purged notes history/);
+    assert.match(err, /unreachable objects/);
+    assert.throws(() => execFileSync('git', ['cat-file', '-e', oldNoteCommit], { cwd: repoDir, stdio: 'ignore' }));
+  });
+
+  test('--purge-notes reports nothing to purge when there is no notes ref', () => {
+    const logged = [];
+    const origLog = console.log;
+    console.log = (...args) => logged.push(args.join(' '));
+    try {
+      const { run } = require('./gc');
+      run(['--purge-notes']);
+    } finally {
+      console.log = origLog;
+    }
+
+    const out = logged.join('\n');
+    assert.match(out, /Nothing to purge/);
+  });
+
+  test('--purge-notes returns without falling through to session pruning', () => {
+    const idA = crypto.randomUUID();
+    makeSessionRefs(idA, 1, git, repoDir);
+
+    const logged = [];
+    const origLog = console.log;
+    const origError = console.error;
+    console.log = (...args) => logged.push(args.join(' '));
+    console.error = () => {};
+    try {
+      const { run } = require('./gc');
+      run(['--purge-notes']);
+    } finally {
+      console.log = origLog;
+      console.error = origError;
+    }
+
+    const out = logged.join('\n');
+    assert.ok(!out.includes('Pruned session'), '--purge-notes must not fall through to session pruning');
   });
 });

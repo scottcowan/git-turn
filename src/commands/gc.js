@@ -28,6 +28,23 @@ function listSessionsByAge() {
 }
 
 function run(args) {
+  if (args.includes('--purge-notes')) {
+    const { purgeNotesHistory } = require('../git');
+    const { NOTES_REF } = require('../session');
+    console.error('git turn gc: this permanently deletes ALL unreachable objects in this');
+    console.error('repository (git gc --prune=now is not scoped to notes) — including any');
+    console.error('dangling commits with no ref protecting them, and discards note history for');
+    console.error('EVERY commit\'s note, not just the one that leaked.');
+    const result = purgeNotesHistory(NOTES_REF);
+    if (!result.purged) {
+      console.log(`Nothing to purge: ${result.reason}`);
+      return;
+    }
+    console.log(`Purged notes history for ${NOTES_REF} (old tip ${result.oldSha.slice(0, 7)} -> new tip ${result.newSha.slice(0, 7)}).`);
+    console.log('Old note blobs are now unreachable and have been pruned.');
+    return;
+  }
+
   if (args.includes('--rebuild')) {
     try {
       const { rebuild } = require('../cache');
