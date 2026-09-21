@@ -83,3 +83,11 @@ None - no external service configuration required.
 ---
 *Phase: 06-verification-redact-command-purge-procedure*
 *Completed: 2026-09-21*
+
+## Self-Check: PASSED
+
+- FOUND: src/commands/cost.js
+- FOUND: src/commands/cost.test.js
+- FOUND: .planning/phases/06-verification-redact-command-purge-procedure/06-02-SUMMARY.md
+- FOUND commit: 9df867b (fix: resolve cost.js note-sha lookup and add end-to-end test coverage)
+- FOUND commit: 34d51d0 (docs: complete cost.js note-sha fix plan)
