@@ -17,21 +17,23 @@ function run(args) {
 
   if (!turn) { console.error(`git turn: turn ${turnN} not found`); process.exit(1); }
 
-  // Get metadata from note
-  const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', turn.sha]);
-  let meta = {};
-  try { meta = note ? JSON.parse(note) : {}; } catch {}
+  const withPrompts = args.includes('--with-prompts');
 
   // Real HEAD sha lives in the snapshot commit's own message body, not
   // notes — refs/notes/git-turn has never carried a `head` field.
   const { headSha } = parseSnapshotMessage(turn.sha);
   const head = headSha || turn.sha;
 
+  // Get metadata from note
+  const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', head]);
+  let meta = {};
+  try { meta = note ? JSON.parse(note) : {}; } catch {}
+
   // Header
   console.log(`Turn ${turnN}  ${head.slice(0, 7)}  ${new Date(meta.ts || 0).toLocaleString()}`);
   if (meta.model) console.log(`Model: ${meta.model}`);
   if (meta.latency_ms) console.log(`Latency: ${meta.latency_ms}ms`);
-  if (meta.prompt) {
+  if (withPrompts && meta.prompt) {
     console.log(`\nPrompt:\n  ${meta.prompt.replace(/\n/g, '\n  ')}`);
   }
   console.log('');
