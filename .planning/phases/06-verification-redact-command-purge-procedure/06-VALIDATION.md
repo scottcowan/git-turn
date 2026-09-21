@@ -1,8 +1,8 @@
 ---
 phase: 6
 slug: verification-redact-command-purge-procedure
-status: draft
-nyquist_compliant: false
+status: ready
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-09-21
 ---
@@ -67,11 +67,11 @@ created: 2026-09-21
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (`show.test.js`, `log.test.js`, `cost.test.js`, `redact.test.js`, `git.test.js` extension)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (`show.test.js`, `log.test.js`, `cost.test.js`, `redact.test.js`, `git.test.js` extension)
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ready for execution — plans 06-01/02/03/04 verified by gsd-plan-checker (2026-09-21). Wave-0 file/task status flips to green only after `/gsd-execute-phase 6` actually runs.
