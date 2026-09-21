@@ -3,8 +3,9 @@
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { rmSync } = require('fs');
+const { execFileSync } = require('node:child_process');
 const { makeTestRepo } = require('./helpers/test-repo');
-const { updateNote, getNote, addNote, headSha } = require('./git');
+const { updateNote, getNote, addNote, headSha, purgeNotesHistory } = require('./git');
 
 describe('updateNote', () => {
   let dir;
@@ -129,5 +130,85 @@ describe('updateNote', () => {
         return { ...existing, prompt: 'never wins' };
       }, { maxRetries: 2 });
     }, /changed concurrently/);
+  });
+});
+
+describe('purgeNotesHistory', () => {
+  let dir;
+  let origCwd;
+
+  beforeEach(() => {
+    origCwd = process.cwd();
+    const repo = makeTestRepo();
+    dir = repo.dir;
+    process.chdir(dir);
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('removes the pre-redaction note blob from the object store while keeping current content', () => {
+    const sha = headSha();
+    addNote('refs/notes/git-turn', sha, JSON.stringify({ prompt: 'SECRET-MARKER' }));
+    const oldNoteCommit = execFileSync('git', ['rev-parse', 'refs/notes/git-turn'], { cwd: dir, encoding: 'utf8' }).trim();
+
+    updateNote('refs/notes/git-turn', sha, existing => ({ ...existing, prompt: '[REDACTED]' }));
+
+    const result = purgeNotesHistory('refs/notes/git-turn');
+
+    assert.equal(result.purged, true);
+    assert.throws(() => execFileSync('git', ['cat-file', '-e', oldNoteCommit], { cwd: dir, stdio: 'ignore' }));
+
+    const note = JSON.parse(getNote('refs/notes/git-turn', sha));
+    assert.equal(note.prompt, '[REDACTED]');
+  });
+
+  test('returns purged:true with a new sha distinct from the old sha', () => {
+    const sha = headSha();
+    addNote('refs/notes/git-turn', sha, JSON.stringify({ prompt: 'SECRET-MARKER' }));
+    updateNote('refs/notes/git-turn', sha, existing => ({ ...existing, prompt: '[REDACTED]' }));
+
+    const result = purgeNotesHistory('refs/notes/git-turn');
+
+    assert.equal(result.purged, true);
+    assert.notEqual(result.newSha, result.oldSha);
+  });
+
+  test('collapses history to a single parentless commit', () => {
+    const sha = headSha();
+    addNote('refs/notes/git-turn', sha, JSON.stringify({ prompt: 'SECRET-MARKER' }));
+    updateNote('refs/notes/git-turn', sha, existing => ({ ...existing, prompt: '[REDACTED]' }));
+
+    const result = purgeNotesHistory('refs/notes/git-turn');
+
+    const parentsOutput = execFileSync(
+      'git',
+      ['rev-list', '--parents', '-n', '1', result.newSha],
+      { cwd: dir, encoding: 'utf8' }
+    ).trim();
+    const tokens = parentsOutput.split(' ').filter(Boolean);
+    assert.equal(tokens.length, 1, 'purged commit must have no parents');
+  });
+
+  test('does not throw when the notes ref has no reflog', () => {
+    const sha = headSha();
+    addNote('refs/notes/git-turn', sha, JSON.stringify({ prompt: 'SECRET-MARKER' }));
+    execFileSync('git', ['config', 'core.logAllRefUpdates', 'false'], { cwd: dir });
+    rmSync(`${dir}/.git/logs`, { recursive: true, force: true });
+
+    let result;
+    assert.doesNotThrow(() => {
+      result = purgeNotesHistory('refs/notes/git-turn');
+    });
+    assert.equal(result.purged, true);
+  });
+
+  test('returns purged:false with a reason on a repo with no notes ref', () => {
+    const result = purgeNotesHistory('refs/notes/git-turn');
+
+    assert.equal(result.purged, false);
+    assert.match(result.reason, /does not exist/);
   });
 });

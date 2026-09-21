@@ -212,10 +212,56 @@ function updateNote(ref, commitSha, patchFn, { maxRetries = 3 } = {}) {
   }
 }
 
+// Collapse a notes ref's entire commit history to a single parentless
+// commit holding its CURRENT tree, then expire its reflog and force a
+// full-repo gc. This is the only way to actually remove an old note blob
+// from the object store — overwriting a note (addNote -f) or even
+// expiring the ref's reflog alone leaves the prior notes-commit reachable
+// as an ordinary ancestor of the current tip (verified empirically,
+// 06-RESEARCH.md Focus Question 7 — this is NOT the same failure mode
+// reflog-expiry protects against).
+//
+// WARNING: `git gc --prune=now` operates on the WHOLE repository, not
+// just this ref. Any other unreachable object in the repo (e.g. a
+// dangling commit from `git stash` or another tool, with no ref/reflog
+// protecting it) is also permanently deleted by this call. This is
+// unavoidable — git has no way to scope object pruning to one ref's
+// history — and must be documented prominently in --help/README, not
+// just here.
+function purgeNotesHistory(ref) {
+  const currentSha = gitSafe(['rev-parse', ref]);
+  if (!currentSha) {
+    return { purged: false, reason: `ref ${ref} does not exist` };
+  }
+
+  const tree = git(['rev-parse', `${ref}^{tree}`]);
+  let newCommit;
+  try {
+    newCommit = git(
+      ['commit-tree', tree, '-m', 'git-turn: purge notes history'],
+      { env: { GIT_AUTHOR_NAME: 'git-turn', GIT_AUTHOR_EMAIL: '', GIT_COMMITTER_NAME: 'git-turn', GIT_COMMITTER_EMAIL: '' } }
+    );
+  } catch {
+    // Fallback per 06-RESEARCH.md Assumption A2: some platforms may reject
+    // empty author/committer emails on commit-tree. Fall back to relying on
+    // repo git config user.name/user.email, which git-turn already requires.
+    newCommit = git(['commit-tree', tree, '-m', 'git-turn: purge notes history']);
+  }
+  updateRef(ref, newCommit);
+
+  // Missing reflog is expected and non-fatal (e.g. core.logAllRefUpdates=false) —
+  // step above already severed the ancestor chain, which is the load-bearing part.
+  gitSafe(['reflog', 'expire', '--expire=now', ref]);
+
+  git(['gc', '--prune=now']);
+
+  return { purged: true, oldSha: currentSha, newSha: newCommit };
+}
+
 module.exports = {
   git, gitSafe, repoRoot, gitDir, hooksDir, headSha, currentBranch, shouldColor,
   updateRef, deleteRef, listRefs,
   snapshotWorktree, restoreSnapshot,
   writeBlob, readBlob,
-  addNote, getNote, updateNote,
+  addNote, getNote, updateNote, purgeNotesHistory,
 };
