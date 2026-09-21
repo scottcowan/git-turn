@@ -35,25 +35,26 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 14 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`, `heatmap`. Full test suite (145 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
 
-**Not yet implemented:** `branch --from <N>` (Phase 6 of v1.0, blocked on the Warren API). `git turn redact <N>` post-hoc scrub, purge remediation procedure, and end-to-end `--with-prompts`/`cost` verification — Phase 6 of v0.3, planned.
+**Not yet implemented:** `branch --from <N>` (Phase 8 of v1.0, blocked on the Warren API). MCP server (Phase 7, v0.4) — planned.
 
 **Phase 4 complete (2026-09-17):** `src/redact.js` — a standalone, zero-dependency secret scanner (`redact(text) -> { text, count }`) covering 9 vendor-prefixed categories (AWS, GitHub, OpenAI, Anthropic, Slack, Google, Stripe, PEM, generic key=value) plus a Shannon-entropy fallback for unstructured tokens, with a SHA/UUID whitelist to avoid false-positive redaction of legitimate git identifiers. Validated against realistic fixtures (22 tests) with documented false-negative behavior.
 
 **Phase 5 complete (2026-09-20):** `git turn record-prompt` — reads a JSON payload on stdin (`{prompt, model, usage, latency_ms, tool_summary}`, all optional), redacts `prompt` through Phase 4's scanner, resolves the latest turn via `listTurns()`/`parseSnapshotMessage()` (never bare `HEAD`), and merges into the note via a new `updateNote(ref, sha, patchFn)` read-compare-retry helper in `src/git.js` (never a blind overwrite of the hook's fields). `usage` is stored verbatim in Anthropic's four-key shape; `tool_summary` is a per-tool call-count breakdown. SQLite cache extended with `usage`/`tool_summary` columns and a narrow `updatePromptFields()` writer. 26 new tests; 3 code-review warnings found and fixed same-phase (type validation on `model`/`tool_summary`, stderr diagnostic on cache-write failure, `??` vs `||` for zero-valued fields).
 
+**Phase 6 complete (2026-09-21), v0.3 milestone done:** Found and fixed a real, previously-masked defect — `show.js`/`log.js`/`cost.js` looked up `refs/notes/git-turn` by the snapshot commit sha instead of the real HEAD commit sha where notes are actually written, so none of them ever saw Phase 5's real data until this phase's fix. Added `show.js`'s missing `--with-prompts` gate (matching `log.js`). Shipped `git turn redact <N>` (scrubs only the `prompt` field via `updateNote()`, no confirmation, matching `revert`/`redo` style) and `git turn gc --purge-notes` (`purgeNotesHistory()`: collapses notes history to a parentless commit, then reflog-expire + `gc --prune=now` — empirically verified the naive reflog-expire+gc-only sequence does NOT remove an old note blob, since `refs/notes/*` is a linear commit chain outside `git filter-repo`/BFG's coverage). Code review also caught and fixed a real pre-existing bug in `cost.js`'s Bedrock cross-region pricing lookup (double-prefixed, unmatchable key). 51 new tests (217 total); all 9 v0.3 requirements complete.
+
 **Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (rich diff renderer, an optional enhancement; mindwalk integration exploration).
 
-## Current Milestone: v0.3 Prompt Capture
+## v0.3 Prompt Capture — SHIPPED (2026-09-21)
 
-**Goal:** Persist prompt/model/latency/usage metadata per turn, safely.
+All target features complete:
+- `git turn record-prompt` — attaches prompt/response metadata to the current turn's note (Phase 5)
+- Note payload carries `prompt`/`model`/`latency_ms`/`usage`/`tool_summary` fields (Phase 5)
+- Secret redaction built into the write path from day one (Phase 4, wired in Phase 5)
+- `log`/`show --with-prompts` and `cost` verified end-to-end against real captured data (Phase 6, after fixing the sha-resolution bug)
+- `git turn redact <N>` and `git turn gc --purge-notes` remediation path (Phase 6)
 
-**Target features:**
-- `git turn record-prompt` — ✓ shipped in Phase 5, attaches prompt/response metadata to the current turn's note
-- Note payload gains `prompt`/`model`/`latency_ms`/`usage`/`tool_summary` fields — ✓ shipped, `log`/`show --with-prompts` and `cost` can now receive real data
-- Secret redaction built into the write path from day one — ✓ shipped in Phase 4 (`src/redact.js`), ✓ wired into `record-prompt` in Phase 5
-- `--with-prompts` flag on `log`/`show` to surface captured prompt content — reader side already existed pre-milestone; end-to-end verification against real data is Phase 6
-
-MCP server (Claude Code addon) deferred to a later milestone — out of scope for v0.3.
+MCP server (Claude Code addon) deferred to v0.4 — out of scope for v0.3.
 
 ## Prior art
 
@@ -79,4 +80,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-20 after Phase 5 (record-prompt note-write path) completion*
+*Last updated: 2026-09-21 after Phase 6 completion — v0.3 milestone shipped*
