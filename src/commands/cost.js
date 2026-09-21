@@ -17,13 +17,15 @@ function pricingCachePath() {
 
 function fetchPricing() {
   return new Promise((resolve, reject) => {
-    https.get(PRICING_URL, res => {
+    const req = https.get(PRICING_URL, res => {
       let data = '';
       res.on('data', chunk => { data += chunk; });
       res.on('end', () => {
         try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
       });
-    }).on('error', reject);
+    });
+    req.setTimeout(10_000, () => req.destroy(new Error('pricing fetch timed out')));
+    req.on('error', reject);
   });
 }
 
