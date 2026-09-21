@@ -25,6 +25,7 @@ Commands:
   branch --from <N>       New worktree from turn N snapshot
   status                  Current session, turn count, hook health
   gc [--keep-sessions N]  Prune old session refs
+  gc --purge-notes       Permanently purge old note blobs from refs/notes/git-turn (see redact)
   session new|list        Manage sessions
   cost                    Show token usage and cost for current session
   record-prompt           Attach prompt/model/usage/latency metadata to the latest turn (JSON on stdin)
