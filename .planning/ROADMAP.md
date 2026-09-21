@@ -40,7 +40,7 @@ Archive: `.planning/milestones/v0.2-ROADMAP.md`, audit: `.planning/milestones/v0
 
 - [x] **Phase 4: Secret Redaction Scanner** - Vendored regex + entropy scanner that redacts likely secrets in free-text content before it can reach a note (completed 2026-09-17)
 - [x] **Phase 5: record-prompt Note-Write Path** - `git turn record-prompt` attaches prompt/model/usage/latency/tool-summary metadata to a turn's note via safe read-merge-write (completed 2026-09-20)
-- [ ] **Phase 6: Verification, Redact Command & Purge Procedure** - `--with-prompts`/`cost` proven against real captured data, plus `redact <N>` and a documented purge procedure for already-written secrets
+- [x] **Phase 6: Verification, Redact Command & Purge Procedure** - `--with-prompts`/`cost` proven against real captured data, plus `redact <N>` and a documented purge procedure for already-written secrets (completed 2026-09-21)
 
 ### 📋 v0.4 MCP Server (Phase 7)
 
@@ -118,7 +118,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 06-04-PLAN.md — REDACT-03: `purgeNotesHistory()` in `src/git.js` (history-collapse → reflog-expire → prune), `gc --purge-notes` dispatch with blast-radius warning, object-store-level tests, README/AGENTS documentation
+- [x] 06-04-PLAN.md — REDACT-03: `purgeNotesHistory()` in `src/git.js` (history-collapse → reflog-expire → prune), `gc --purge-notes` dispatch with blast-radius warning, object-store-level tests, README/AGENTS documentation
 
 ### Phase 7: MCP server
 
@@ -152,7 +152,7 @@ Plans:
 | 03.1. Turn heatmap | v0.2 | 4/4 | Complete | 2026-09-08 |
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
 | 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
-| 6. Verification, redact command & purge procedure | v0.3 | 3/4 | In Progress|  |
+| 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete   | 2026-09-21 |
 | 7. MCP server | v0.4 | 0/? | Planned | — |
 | 8. Warren integration | v1.0 | 0/? | Planned | — |
 
