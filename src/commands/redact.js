@@ -49,7 +49,12 @@ function run(args) {
     return;
   }
 
-  updateNote(NOTES_REF, noteSha, existing => ({ ...existing, prompt: '[REDACTED]' }));
+  try {
+    updateNote(NOTES_REF, noteSha, existing => ({ ...existing, prompt: '[REDACTED]' }));
+  } catch (e) {
+    console.error(`git turn: redact failed: ${e.message}`);
+    process.exit(1);
+  }
 
   try {
     const { updatePromptFields } = require('../cache');
