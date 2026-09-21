@@ -48,9 +48,8 @@ function lookupPrice(pricing, model) {
   // Try exact match, then strip provider prefixes (eu., us., anthropic.)
   const candidates = [
     model,
-    model.replace(/^(eu|us|ap|au)\./i, 'anthropic.'),
+    model.replace(/^(eu|us|ap|au)\.(?=anthropic\.)/i, ''),   // us.anthropic.X -> anthropic.X
     `anthropic.${model}`,
-    model,
   ];
   for (const key of candidates) {
     const entry = pricing[key];
