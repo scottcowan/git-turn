@@ -35,7 +35,14 @@ function run(args) {
     console.error('repository (git gc --prune=now is not scoped to notes) — including any');
     console.error('dangling commits with no ref protecting them, and discards note history for');
     console.error('EVERY commit\'s note, not just the one that leaked.');
-    const result = purgeNotesHistory(NOTES_REF);
+    let result;
+    try {
+      result = purgeNotesHistory(NOTES_REF);
+    } catch (e) {
+      console.error(`git turn gc: notes ref rewritten but pruning failed: ${e.message}`);
+      console.error('The old note blob may still be reachable — rerun with no other git process active.');
+      process.exit(1);
+    }
     if (!result.purged) {
       console.log(`Nothing to purge: ${result.reason}`);
       return;
