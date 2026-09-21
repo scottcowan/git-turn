@@ -107,7 +107,18 @@ Plans:
   3. A user can run `git turn redact <N>` to manually scrub a specific turn's note content after the fact.
   4. A documented purge procedure (reflog-expire + `gc --prune=now` scoped to `refs/notes/git-turn`) exists and is verified to actually remove an old note blob, since neither `git filter-repo` nor BFG cover this ref namespace.
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — VERIFY-01: fix the note-sha resolution bug in `show.js` and `log.js`'s `--no-cache` walk, add `show.js`'s `--with-prompts` gate, new `show.test.js` + `log.test.js` end-to-end coverage
+- [ ] 06-02-PLAN.md — VERIFY-02: fix the same note-sha bug in `cost.js`, new `cost.test.js` with a network-free `HOME`-scoped pricing fixture proving a correct `$0.0105` total
+- [ ] 06-03-PLAN.md — REDACT-02: new `src/commands/redact.js` (prompt-only scrub via `updateNote`, no confirmation, cache sync) + `redact.test.js` + `bin/git-turn` registration
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 06-04-PLAN.md — REDACT-03: `purgeNotesHistory()` in `src/git.js` (history-collapse → reflog-expire → prune), `gc --purge-notes` dispatch with blast-radius warning, object-store-level tests, README/AGENTS documentation
 
 ### Phase 7: MCP server
 
@@ -141,7 +152,7 @@ Plans:
 | 03.1. Turn heatmap | v0.2 | 4/4 | Complete | 2026-09-08 |
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
 | 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
-| 6. Verification, redact command & purge procedure | v0.3 | 0/? | Not started | — |
+| 6. Verification, redact command & purge procedure | v0.3 | 0/4 | Planned | — |
 | 7. MCP server | v0.4 | 0/? | Planned | — |
 | 8. Warren integration | v1.0 | 0/? | Planned | — |
 
