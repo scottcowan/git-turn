@@ -1,9 +1,9 @@
 ---
 phase: 5
 slug: record-prompt-note-write-path
-status: ready
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-09-18
 ---
 
@@ -38,13 +38,13 @@ created: 2026-09-18
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 05-01-01 | 01 | 1 | CAPTURE-01 | T-05-03 | RED: `updateNote()` does not exist yet | unit | `node --test src/git.test.js` | ❌ W0 | ⬜ pending |
-| 05-01-02 | 01 | 1 | CAPTURE-01 | T-05-03 | GREEN: `updateNote(ref, sha, patchFn)` bounded read-compare-retry merge helper preserves hook fields | unit | `node --test src/git.test.js` | ❌ W0 | ⬜ pending |
-| 05-02-01 | 02 | 1 | CAPTURE-02, CAPTURE-03, CAPTURE-04 | T-05-04 | RED: `usage`/`tool_summary` columns and `updatePromptFields()` do not exist yet | unit | `node --test src/cache.test.js` | ❌ W0 | ⬜ pending |
-| 05-02-02 | 02 | 1 | CAPTURE-02, CAPTURE-03, CAPTURE-04 | T-05-04 | GREEN: guarded `ALTER TABLE` migration + `updatePromptFields()` COALESCE merge persists `usage`/`latency_ms`/`tool_summary` | unit | `node --test src/cache.test.js` | ❌ W0 | ⬜ pending |
-| 05-03-01 | 03 | 2 | CAPTURE-01..04 | T-05-01, T-05-02 | `record-prompt` reads stdin JSON, redacts `prompt`, resolves target turn via `listTurns()`/`parseSnapshotMessage()` (never bare `HEAD`), merges via `updateNote()`, updates cache | unit + integration | `node --test src/commands/record-prompt.test.js` | ❌ W0 | ⬜ pending |
-| 05-03-02 | 03 | 2 | CAPTURE-02 | T-05-02 | `usage` written verbatim in Anthropic shape; note/cache round-trip asserted (deepEqual) | integration | `node --test src/commands/record-prompt.test.js` | ❌ W0 | ⬜ pending |
-| 05-03-03 | 03 | 2 | — | — | `bin/git-turn` registration + `--help`/`AGENTS.md` documentation | design review | grep gate + manual `--help` check | ❌ W0 | ⬜ pending |
+| 05-01-01 | 01 | 1 | CAPTURE-01 | T-05-03 | RED: `updateNote()` does not exist yet | unit | `node --test src/git.test.js` | ✅ | ✅ green |
+| 05-01-02 | 01 | 1 | CAPTURE-01 | T-05-03 | GREEN: `updateNote(ref, sha, patchFn)` bounded read-compare-retry merge helper preserves hook fields | unit | `node --test src/git.test.js` | ✅ | ✅ green |
+| 05-02-01 | 02 | 1 | CAPTURE-02, CAPTURE-03, CAPTURE-04 | T-05-04 | RED: `usage`/`tool_summary` columns and `updatePromptFields()` do not exist yet | unit | `node --test src/cache.test.js` | ✅ | ✅ green |
+| 05-02-02 | 02 | 1 | CAPTURE-02, CAPTURE-03, CAPTURE-04 | T-05-04 | GREEN: guarded `ALTER TABLE` migration + `updatePromptFields()` COALESCE merge persists `usage`/`latency_ms`/`tool_summary` | unit | `node --test src/cache.test.js` | ✅ | ✅ green |
+| 05-03-01 | 03 | 2 | CAPTURE-01..04 | T-05-01, T-05-02 | `record-prompt` reads stdin JSON, redacts `prompt`, resolves target turn via `listTurns()`/`parseSnapshotMessage()` (never bare `HEAD`), merges via `updateNote()`, updates cache | unit + integration | `node --test src/commands/record-prompt.test.js` | ✅ | ✅ green |
+| 05-03-02 | 03 | 2 | CAPTURE-02 | T-05-02 | `usage` written verbatim in Anthropic shape; note/cache round-trip asserted (deepEqual) | integration | `node --test src/commands/record-prompt.test.js` | ✅ | ✅ green |
+| 05-03-03 | 03 | 2 | — | — | `bin/git-turn` registration + `--help`/`AGENTS.md` documentation | design review | grep gate + manual `--help` check | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -52,11 +52,11 @@ created: 2026-09-18
 
 ## Wave 0 Requirements
 
-- [ ] `src/commands/record-prompt.js` — does not exist yet; Plan 05-03 creates it
-- [ ] `src/commands/record-prompt.test.js` — does not exist yet; Plan 05-03 creates it (colocated with other command tests per project convention, not the standalone `src/record-prompt.test.js` path this document originally sketched)
-- [ ] `updateNote()` in `src/git.js` — does not exist yet; Plan 05-01 creates it plus a new `src/git.test.js`
-- [ ] `usage TEXT`/`tool_summary TEXT` columns + `updatePromptFields()` in `src/cache.js` — does not exist yet; Plan 05-02 creates them plus a new `src/cache.test.js`
-- [ ] Framework install: none needed — `node:test` is built in
+- [x] `src/commands/record-prompt.js` — does not exist yet; Plan 05-03 creates it
+- [x] `src/commands/record-prompt.test.js` — does not exist yet; Plan 05-03 creates it (colocated with other command tests per project convention, not the standalone `src/record-prompt.test.js` path this document originally sketched)
+- [x] `updateNote()` in `src/git.js` — does not exist yet; Plan 05-01 creates it plus a new `src/git.test.js`
+- [x] `usage TEXT`/`tool_summary TEXT` columns + `updatePromptFields()` in `src/cache.js` — does not exist yet; Plan 05-02 creates them plus a new `src/cache.test.js`
+- [x] Framework install: none needed — `node:test` is built in
 
 ---
 
@@ -75,4 +75,4 @@ created: 2026-09-18
 - [x] Feedback latency < 5s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** ready for execution — plans 05-01/05-02/05-03 verified by gsd-plan-checker (2026-09-18), test paths reconciled to match final plans. Marked `wave_0_complete`/task status green only after `/gsd-execute-phase 5` actually runs.
+**Approval:** complete — 05-01/05-02/05-03 executed, full suite green (193/193 at phase close).
