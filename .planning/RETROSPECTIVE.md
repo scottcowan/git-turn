@@ -95,15 +95,59 @@
 - Multiple ad hoc ships (Phase 2, session/export) bypassed the full workflow entirely — direct implementation + tests + docs
 - One subagent-caused git incident required manual recovery (tag backup, reset, re-apply, re-commit)
 
+## Milestone: v0.3 — Prompt Capture
+
+**Shipped:** 2026-10-01
+**Phases:** 3 (4, 5, 6) | **Plans:** 8
+
+### What Was Built
+
+- `src/redact.js` — zero-dependency secret scanner (9 vendor regex categories + Shannon-entropy fallback, SHA/UUID whitelist), validated against 22 realistic fixtures
+- `updateNote()` in `src/git.js` — bounded read-compare-retry merge wrapper for git-notes, preserving the post-commit hook's forensic fields instead of a blind overwrite
+- `git turn record-prompt` — stdin-JSON note writer wiring prompt/model/usage/latency_ms/tool_summary into the current turn's note, with mandatory redaction and best-effort SQLite cache mirroring
+- Fixed a real, previously-masked defect: `show.js`/`log.js`/`cost.js` resolved notes by the dangling snapshot sha instead of the real HEAD sha, so none of them had ever rendered Phase 5's real data until Phase 6 caught it
+- `git turn redact <N>` and `git turn gc --purge-notes` — post-hoc remediation path, with `purgeNotesHistory()` empirically proven (not just assumed) to remove an old note blob from the object store
+- Fixed a pre-existing, unrelated bug in `cost.js`'s Bedrock cross-region pricing lookup, found incidentally during Phase 6 code review
+
+### What Worked
+
+- Sequencing the scanner (Phase 4) before any writer touched real content caught the "redact before every note write, no bypass" requirement structurally rather than via a late audit
+- Running a live E2E milestone audit (not just unit tests) caught the sha-resolution bug for `show`/`log`/`cost` and confirmed the full init→commit→record-prompt→show/cost→redact→purge→show/cost sequence actually works, not just in isolation
+- `updateNote()`'s read-compare-retry pattern, established once in Phase 5, was reused directly by `redact` (Phase 6) with no modification — one merge-write primitive, two callers
+
+### What Was Inefficient
+
+- The sha-resolution bug (notes looked up by snapshot sha instead of head sha) shipped in Phase 5 and sat silently broken through that phase's own "passed" verification — Phase 5's unit tests exercised `record-prompt`'s write path but never asserted that `show`/`log`/`cost` could actually read back what was written; only Phase 6's live E2E check caught it
+- `tool_summary` is captured and persisted correctly but no reader command displays it yet — a write-only field, flagged as tech debt rather than blocking the milestone
+- `log --no-cache` computes its diff-stat against the snapshot sha rather than the real HEAD sha (a pre-existing `--no-cache` fallback inconsistency, unrelated to prompt-capture wiring) — found incidentally by the same E2E audit pass, not fixed in-milestone
+
+### Patterns Established
+
+- `updateNote(ref, sha, patchFn)` as the standard primitive for any note mutation that must preserve fields it didn't touch — `addNote()`'s blind overwrite is now reserved for the post-commit hook's own first write only
+- Unconditional secret redaction on every write path with no opt-out flag, enforced at the scanner level (Phase 4) before any writer (Phase 5) exists to bypass it
+- Verifying a read path against real data written by its own paired write path, not just isolated fixtures, as a required phase-6-style step — not just a nice-to-have audit extra
+
+### Key Lessons
+
+- A note-writer's own unit tests passing is not sufficient evidence that the readers consuming the same ref can actually see the data — pair write-path and read-path verification in the same phase, or budget an explicit live round-trip check before calling a capture feature done
+- Secret redaction is cheap to get right when it's built first and wired unconditionally; retrofitting it onto an existing writer would have been a much larger, riskier change
+- Tech debt surfaced by a milestone audit (tool_summary write-only, `--no-cache` diff-stat bug) is fine to carry forward explicitly rather than blocking close — as long as it's written down somewhere a future phase will actually see it
+
+### Cost Observations
+
+- Full GSD phase workflow run for all 3 phases (Phase 4, 5, 6) — discuss → plan → execute → verify, no ad hoc shipping this milestone
+- Phase 5 ran in two waves (git.js/cache.js prerequisites, then the command); Phase 6 ran in two waves (show/log/cost fixes + redact, then the purge procedure) — wave-gating caught the shared sha-resolution bug once instead of three times
+- Test suite grew from 145 (v0.2 close) to 217 (72 new tests) across the milestone
+
 ## Cross-Milestone Trends
 
-| Metric | v0.1 | v0.2 |
-|---|---|---|
-| Phases (governed) | 1 | 2 (Phase 3, 03.1) |
-| Phases (ad hoc) | 0 | 2 (Phase 2, session/export) |
-| Plans | 6 | 8 governed |
-| Test suite size | 23 | 145 |
-| Milestone audit run | No | Yes — found 1 real bug |
-| STATE.md manual corrections needed | 0 | 5+ |
+| Metric | v0.1 | v0.2 | v0.3 |
+|---|---|---|---|
+| Phases (governed) | 1 | 2 (Phase 3, 03.1) | 3 (Phase 4, 5, 6) |
+| Phases (ad hoc) | 0 | 2 (Phase 2, session/export) | 0 |
+| Plans | 6 | 8 governed | 8 governed |
+| Test suite size | 23 | 145 | 217 |
+| Milestone audit run | No | Yes — found 1 real bug | Yes — found 1 real bug (sha resolution) + 2 tech-debt items |
+| STATE.md manual corrections needed | 0 | 5+ | 0 |
 
-**Trend:** Ad hoc shipping (skip full phase machinery for small, well-understood work) is a recurring and apparently deliberate pattern here, not a one-off — worth treating as a first-class lightweight path in tooling rather than an exception each GSD SDK call has to special-case around.
+**Trend:** Ad hoc shipping (skip full phase machinery for small, well-understood work) was a recurring pattern through v0.2 but dropped to zero in v0.3 — all three phases went through the full discuss→plan→execute→verify workflow. Milestone audits continue to pay for themselves: both v0.2 and v0.3 audits caught real bugs that phase-local unit tests missed, reinforcing that live E2E checks against real written data are not optional for note-write/note-read features.

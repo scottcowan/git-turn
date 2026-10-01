@@ -1,5 +1,24 @@
 # Milestones
 
+## v0.3 Prompt Capture (Shipped: 2026-10-01)
+
+**Phases completed:** 3 phases, 8 plans, 16 tasks
+
+Known deferred items at close: 2 (see STATE.md Deferred Items)
+
+**Key accomplishments:**
+
+- Zero-dependency `redact(text)` scanner: 10 vendor regex patterns (AWS/GitHub/OpenAI/Anthropic/Slack/Google/Stripe/PEM/generic) plus Shannon-entropy fallback with SHA/UUID whitelist, proven against 22 node:test fixtures including ReDoS bound and no-bypass surface checks.
+- Added `updateNote()` to src/git.js — a bounded read-compare-retry merge wrapper around git-notes that preserves the post-commit hook's forensic fields (session_id/turn_n/snapshot_sha/ts) instead of the blind overwrite `addNote()` performs.
+- Guarded ALTER TABLE migration adds `usage`/`tool_summary` columns to the SQLite read cache in place, plus a new `updatePromptFields()` writer using per-column COALESCE for merge-not-overwrite semantics.
+- `git turn record-prompt` reads one JSON blob from stdin and merges prompt/model/usage/latency_ms/tool_summary into the latest turn's note via `updateNote()`, redacting the prompt through Phase 4's scanner and best-effort mirroring into the SQLite cache — the last missing writer in the v0.3 milestone.
+- Task 1 — `show.js` fix + `--with-prompts` gate + first-ever test coverage:
+- cost.js now resolves its per-turn notes lookup via `parseSnapshotMessage(sha).headSha` instead of the bare snapshot sha, with new end-to-end test coverage proving a correct $0.0105 total from real captured usage with zero network access.
+- `git turn redact <N>` scrubs a turn's captured prompt field to `[REDACTED]` via merge-write on the correctly-resolved head sha, leaving every other note field byte-identical and syncing the SQLite read cache.
+- `git turn gc --purge-notes` ships a real, empirically-verified purge: it collapses `refs/notes/git-turn` to a single parentless commit holding the current (redacted) tree, expires the ref's reflog, then runs `git gc --prune=now` — the only sequence that actually removes an old note blob from the object store, per 06-RESEARCH.md Focus Question 7's live repro that disproved the milestone's original reflog-expire-only assumption.
+
+---
+
 ## v0.2 Read Cache + Blame/Bisect (Shipped: 2026-09-17)
 
 **Phases completed:** 2 phases, 8 plans, 18 tasks

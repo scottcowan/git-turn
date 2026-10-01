@@ -31,30 +31,23 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 ## Current State
 
-**Shipped:** v0.2 (Read Cache + Blame/Bisect) as of 2026-09-17 — see `.planning/milestones/v0.2-ROADMAP.md` and `.planning/milestones/v0.2-MILESTONE-AUDIT.md` (audit: passed). Covers v0.1 (Working CLI) through Phase 03.1 (turn heatmap): SQLite read cache, real `blame`/`bisect` at turn granularity, calendar-grid heatmap, colorized diff output, session fork lineage (`session new --from`), and cross-repo `export`.
+**Shipped:** v0.3 (Prompt Capture) as of 2026-10-01 — see `.planning/milestones/v0.3-ROADMAP.md`, `.planning/milestones/v0.3-REQUIREMENTS.md`, and `.planning/milestones/v0.3-MILESTONE-AUDIT.md` (audit: passed, 9/9 requirements, all 4 E2E flows verified live). Covers v0.1 (Working CLI) through v0.3 (Prompt Capture): SQLite read cache, real `blame`/`bisect` at turn granularity, calendar-grid heatmap, colorized diff output, session fork lineage (`session new --from`), cross-repo `export`, and now per-turn prompt/model/usage/latency capture with mandatory secret redaction.
 
-14 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`, `heatmap`. Full test suite (145 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
+15 commands working end-to-end: `init`, `log`, `show`, `diff`, `blame`, `bisect`, `revert`, `redo`, `status`, `gc`, `cost`, `session` (new/list), `export`, `heatmap`, `record-prompt`, `redact`. Full test suite (217 tests). Hook installs via absolute path for cross-repo compatibility, and respects `core.hooksPath` (Husky/lefthook) instead of assuming the default hooks dir.
 
-**Not yet implemented:** `branch --from <N>` (Phase 8 of v1.0, blocked on the Warren API). MCP server (Phase 7, v0.4) — planned.
+**v0.3 delivered (Phases 4-6):**
+- **Phase 4** — `src/redact.js`: standalone, zero-dependency secret scanner (`redact(text) -> { text, count }`) covering 9 vendor-prefixed categories (AWS, GitHub, OpenAI, Anthropic, Slack, Google, Stripe, PEM, generic key=value) plus a Shannon-entropy fallback for unstructured tokens, with a SHA/UUID whitelist to avoid false-positive redaction of legitimate git identifiers. Validated against realistic fixtures (22 tests) with documented false-negative behavior.
+- **Phase 5** — `git turn record-prompt`: reads a JSON payload on stdin (`{prompt, model, usage, latency_ms, tool_summary}`, all optional), redacts `prompt` through Phase 4's scanner, resolves the latest turn via `listTurns()`/`parseSnapshotMessage()` (never bare `HEAD`), and merges into the note via a new `updateNote(ref, sha, patchFn)` read-compare-retry helper in `src/git.js` (never a blind overwrite of the hook's fields). `usage` is stored verbatim in Anthropic's four-key shape; `tool_summary` is a per-tool call-count breakdown. SQLite cache extended with `usage`/`tool_summary` columns and a narrow `updatePromptFields()` writer.
+- **Phase 6** — found and fixed a real, previously-masked defect: `show.js`/`log.js`/`cost.js` looked up `refs/notes/git-turn` by the snapshot commit sha instead of the real HEAD commit sha where notes are actually written, so none of them ever saw Phase 5's real data until this phase's fix. Added `show.js`'s missing `--with-prompts` gate (matching `log.js`). Shipped `git turn redact <N>` (scrubs only the `prompt` field via `updateNote()`, no confirmation, matching `revert`/`redo` style) and `git turn gc --purge-notes` (`purgeNotesHistory()`: collapses notes history to a parentless commit, then reflog-expire + `gc --prune=now` — empirically verified the naive reflog-expire+gc-only sequence does NOT remove an old note blob, since `refs/notes/*` is a linear commit chain outside `git filter-repo`/BFG's coverage). Also fixed a real pre-existing bug in `cost.js`'s Bedrock cross-region pricing lookup (double-prefixed, unmatchable key).
 
-**Phase 4 complete (2026-09-17):** `src/redact.js` — a standalone, zero-dependency secret scanner (`redact(text) -> { text, count }`) covering 9 vendor-prefixed categories (AWS, GitHub, OpenAI, Anthropic, Slack, Google, Stripe, PEM, generic key=value) plus a Shannon-entropy fallback for unstructured tokens, with a SHA/UUID whitelist to avoid false-positive redaction of legitimate git identifiers. Validated against realistic fixtures (22 tests) with documented false-negative behavior.
+**Not yet implemented:** `branch --from <N>` (Phase 8 of v1.0, blocked on the Warren API). MCP server (Phase 7, v0.4) — planned next.
 
-**Phase 5 complete (2026-09-20):** `git turn record-prompt` — reads a JSON payload on stdin (`{prompt, model, usage, latency_ms, tool_summary}`, all optional), redacts `prompt` through Phase 4's scanner, resolves the latest turn via `listTurns()`/`parseSnapshotMessage()` (never bare `HEAD`), and merges into the note via a new `updateNote(ref, sha, patchFn)` read-compare-retry helper in `src/git.js` (never a blind overwrite of the hook's fields). `usage` is stored verbatim in Anthropic's four-key shape; `tool_summary` is a per-tool call-count breakdown. SQLite cache extended with `usage`/`tool_summary` columns and a narrow `updatePromptFields()` writer. 26 new tests; 3 code-review warnings found and fixed same-phase (type validation on `model`/`tool_summary`, stderr diagnostic on cache-write failure, `??` vs `||` for zero-valued fields).
+**Known issues:** none currently tracked. Milestone audit noted two pieces of tech debt (non-blocking, carried forward): `tool_summary` is captured and persisted but no reader command displays it yet (write-only field); `log --no-cache` computes its diff stat against the snapshot sha instead of the real HEAD sha (pre-existing `--no-cache` fallback inconsistency, found incidentally during E2E audit). See `.planning/todos/pending/` for other open work (rich diff renderer, an optional enhancement; mindwalk integration exploration — both acknowledged and deferred at v0.3 close).
 
-**Phase 6 complete (2026-09-21), v0.3 milestone done:** Found and fixed a real, previously-masked defect — `show.js`/`log.js`/`cost.js` looked up `refs/notes/git-turn` by the snapshot commit sha instead of the real HEAD commit sha where notes are actually written, so none of them ever saw Phase 5's real data until this phase's fix. Added `show.js`'s missing `--with-prompts` gate (matching `log.js`). Shipped `git turn redact <N>` (scrubs only the `prompt` field via `updateNote()`, no confirmation, matching `revert`/`redo` style) and `git turn gc --purge-notes` (`purgeNotesHistory()`: collapses notes history to a parentless commit, then reflog-expire + `gc --prune=now` — empirically verified the naive reflog-expire+gc-only sequence does NOT remove an old note blob, since `refs/notes/*` is a linear commit chain outside `git filter-repo`/BFG's coverage). Code review also caught and fixed a real pre-existing bug in `cost.js`'s Bedrock cross-region pricing lookup (double-prefixed, unmatchable key). 51 new tests (217 total); all 9 v0.3 requirements complete.
+## Next Milestone Goals (v0.4 MCP Server)
 
-**Known issues:** none currently tracked — see `.planning/todos/pending/` for open work (rich diff renderer, an optional enhancement; mindwalk integration exploration).
-
-## v0.3 Prompt Capture — SHIPPED (2026-09-21)
-
-All target features complete:
-- `git turn record-prompt` — attaches prompt/response metadata to the current turn's note (Phase 5)
-- Note payload carries `prompt`/`model`/`latency_ms`/`usage`/`tool_summary` fields (Phase 5)
-- Secret redaction built into the write path from day one (Phase 4, wired in Phase 5)
-- `log`/`show --with-prompts` and `cost` verified end-to-end against real captured data (Phase 6, after fixing the sha-resolution bug)
-- `git turn redact <N>` and `git turn gc --purge-notes` remediation path (Phase 6)
-
-MCP server (Claude Code addon) deferred to v0.4 — out of scope for v0.3.
+- Claude Code addon exposing `git_turn_log`, `git_turn_show`, `git_turn_revert` as MCP tools (Phase 7)
+- Candidate stretch: surface `tool_summary` in a reader command; fix the `log --no-cache` diff-stat sha bug (both carried as tech debt from v0.3)
 
 ## Prior art
 
@@ -80,4 +73,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-21 after Phase 6 completion — v0.3 milestone shipped*
+*Last updated: 2026-10-01 after v0.3 milestone completion*
