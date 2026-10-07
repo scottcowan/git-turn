@@ -1,219 +1,147 @@
-# Pitfalls Research
+# Pitfalls Research: Adding an MCP Server to an Existing CLI (git-turn)
 
-**Domain:** Adding prompt/response capture + secret redaction to a git-notes-based audit tool (git-turn v0.3)
-**Researched:** 2026-09-17
-**Confidence:** MEDIUM — git-notes mechanics (`-f`, `copy`, `notes.rewrite.*`) verified against `git-scm.com/docs/git-notes`; filter-repo/BFG notes-handling gap confirmed by absence in official docs (git-filter-repo manual and README contain zero mentions of `notes`/`refs/notes`); secret-scanner-coverage and race-condition claims are reasoned from the existing codebase (`src/git.js`, `src/hooks/post-commit.js`) and general git object-model behavior, not independently verified against a live filter-repo run — treat those as MEDIUM/LOW and validate empirically before shipping.
+**Domain:** Bolting a stdio MCP server onto an existing synchronous, print-and-exit Node.js CLI that reads git + a SQLite cache
+**Researched:** 2026-10-07
+**Confidence:** HIGH (code-verified against this repo) / MEDIUM (MCP stdio transport conventions, well-established spec behavior but not independently re-fetched this session)
 
 ## Critical Pitfalls
 
-### Pitfall 1: `addNote()` always passes `-f`, so `record-prompt` will silently clobber the hook's note (and vice versa)
+### Pitfall 1: Reusing command modules verbatim corrupts the JSON-RPC stream via stdout
 
 **What goes wrong:**
-`src/git.js` `addNote()` is hard-coded to `git notes add -f -m <message> <sha>` — force is unconditional. `post-commit.js` writes `{session_id, turn_n, snapshot_sha, ts}` on `HEAD` after every commit. When `record-prompt` is added, it will need to attach `prompt`/`model`/`latency_ms`/`usage` to that same commit's note. If `record-prompt` does a blind `addNote()` with just the new fields, it **replaces** the whole note body — `session_id`/`turn_n`/`snapshot_sha` are gone, and `log`/`show`/the SQLite cache lose the ability to associate that commit with its turn. If it instead does read-modify-write (get note → merge → `addNote -f`), two racing writers (the in-process post-commit hook and a separately-invoked `record-prompt` CLI process) can each read a stale copy and overwrite each other's update — classic lost-update race. There is no cross-process lock; `post-commit.js`'s `pending` promise chain only serializes writes *within one Node process*, not across the hook process and a `record-prompt` process.
+The MCP stdio transport uses stdout exclusively for framed JSON-RPC messages. Every existing command module in this repo (`src/commands/log.js:17,32,34,37,48,65,68`, and the same pattern in `show.js`/`diff.js`/`blame.js`/`cost.js`) calls `console.log()` directly to print human-formatted text — session banners, padded columns, truncated prompt previews. If an MCP tool handler calls `run(args)` from one of these modules unmodified, that `console.log` output interleaves with (or entirely corrupts) the JSON-RPC frames on stdout, breaking every tool call in the session, not just the one that leaked output.
 
 **Why it happens:**
-`-f` was added to make the hook idempotent against re-runs (e.g. `commit --amend` re-triggering post-commit), not to support a second writer merging fields into the same note. The existing code was written when only one writer (the hook) ever touched `refs/notes/git-turn`. Adding a second writer without revisiting the merge strategy is the natural way to break it.
+These modules were designed for exactly one caller shape: a one-shot CLI invocation where stdout *is* the entire user-facing product. There was never a reason to separate "format for a human terminal" from "return structured data" because there was only ever one consumer. Reusing them for MCP tools is the obvious, cheapest-looking path — call the same `run()`, capture the output — and that's precisely what makes the mistake attractive.
 
 **How to avoid:**
-- Make note updates always read-modify-write through a single helper (`updateNote(ref, sha, patchFn)`) that does `getNote` → `JSON.parse` (defend against missing/corrupt note) → apply `patchFn` → `addNote -f`. Never let `record-prompt` write a raw object with only its own fields.
-- Add an actual lock for the note-write critical section that works across processes, not just within one Node process — e.g. `git update-ref --create-reflog` semantics won't help here since `git notes add` already does its own ref-lock at the git level (see Pitfall 2), but the *read-modify-write* window around it is not protected by git. Options: retry-on-conflict (write, then re-read and diff to detect clobber, retry N times), or a lightweight lockfile in `.git/git-turn/` scoped to the specific commit sha being annotated.
-- Treat `record-prompt` as expected to usually run well after the commit (post-commit hook has already finished), so design the retry/merge path for the rare-but-possible overlap rather than assuming it away.
+Each command module needs its formatting logic split from its data-gathering logic *before* any MCP tool handler is written — e.g. extract `getTurns(session)` / `getTurnDetail(n)` style functions that return plain objects/arrays, with the existing `run()` becoming a thin wrapper that formats and `console.log`s the result. The MCP tool handler calls the data function directly and never calls `run()`. Do not attempt to capture stdout by monkeypatching `console.log` around the `run()` call — this is fragile (any nested async callback, SQLite driver warning, or `child_process` passthrough can bypass the patched reference) and does not solve pitfall 2 below.
 
 **Warning signs:**
-- `log --with-prompts` occasionally shows a turn with `session_id`/`turn_n` missing even though the turn ref exists.
-- SQLite cache rebuild (`gc --rebuild`) surfaces notes that fail JSON parsing or are missing expected keys.
-- Manual repro: fire a commit and immediately (same tick) run `record-prompt` in a tight loop — look for dropped fields.
+Any MCP tool handler that imports a `run` function from `src/commands/*.js` and calls it directly. Any `console.log`/`console.error`/`process.stdout.write` call reachable from a tool handler's code path. Garbled or truncated JSON-RPC responses in an MCP client log, especially ones that look like two responses concatenated.
 
 **Phase to address:**
-Note-write path / `record-prompt` implementation phase (before secret redaction is even in scope) — this is a correctness prerequisite for the whole feature, not an add-on.
+Must be solved in the first MCP phase, before any tool handler is written — not retrofitted. The extraction of data-returning functions from each of the five target commands (`log`, `show`, `diff`, `blame`, `cost`) is itself phase-0 prerequisite work, not part of "wire up the MCP server" work.
 
 ---
 
-### Pitfall 2: `git notes add` without `-f` aborts on an existing note — and the codebase's blanket `-f` hides *when* a collision happened
+### Pitfall 2: Dependencies print to stdout/stderr independently of your own code
 
 **What goes wrong:**
-Per `git-notes(1)`: `git notes add` **aborts** if the target object already has a note, unless `-f`/`--force` is given (interactive `add` with no `-m` instead drops into edit mode on the existing note — different, also surprising, behavior). Since `addNote()` in `src/git.js` always passes `-f`, git-turn will never see this failure — it will silently succeed and overwrite. That's fine for idempotent hook re-runs, but it means the codebase currently has **no way to detect "a note already existed here"** — which is exactly the signal needed to decide whether `record-prompt` should merge into an existing hook-written note vs. create a fresh one. Losing that signal is what enables Pitfall 1.
+Even after extracting clean data functions, two things in this codebase write to the console on their own initiative, outside the command module's control: `src/cache.js` installs a `process.on('warning', ...)` listener and calls `process.removeAllListeners('warning')` at module load to suppress Node's `node:sqlite` experimental-API warning (`src/cache.js:7-10`) — any warning Node emits that doesn't match the SQLite filter gets re-emitted via `process.emitWarning`, which by default prints to **stderr**, not stdout, so it's not a protocol-corruption risk by itself, but it establishes that this module already assumes it's the only thing calling `process.on('warning', ...)` in the process. In a long-running MCP server, re-requiring `cache.js` doesn't re-run that listener registration (module cache), but any *other* dependency that logs via `console.log` instead of `console.error`/`process.stderr.write` — including a future npm dependency added for MCP SDK plumbing itself, or `git`/`gitSafe` stderr-suppression gaps (several `gitSafe` calls pass `{ stdio: ['pipe', 'pipe', 'ignore'] }` explicitly, implying some callers do NOT suppress stderr and rely on it leaking to the terminal) — is a live risk once the process is long-running and shared across many tool calls instead of exiting after one.
 
 **Why it happens:**
-`-f` was chosen for simplicity/idempotency and nobody needed to distinguish "created" from "overwrote" until a second writer showed up.
+A one-shot CLI doesn't care if a dependency prints a stray line to stdout — it's indistinguishable from the command's own intentional output and the process exits immediately after. In a persistent server, any stdout write from *any* code path (including transitive dependencies) during the server's lifetime corrupts the stream for every subsequent message, not just the triggering call.
 
 **How to avoid:**
-- Before writing, call `getNote()` first (already exists in `git.js`) to check for an existing note and branch: if present, merge fields in Node and write the merged JSON with `-f`; if absent, write fresh. This makes the "already exists" case explicit in application logic rather than relying on git's abort behavior (which `-f` bypasses anyway).
-- Keep using `-f` at the git level (still needed for legitimate re-runs / amends) but never rely on git's own conflict signal — the merge decision belongs in `updateNote()`, not in git's exit code.
+Audit every module reachable from the five target data functions (`git.js`, `cache.js`, `session.js`, `blame-util.js`, plus the `node:sqlite` driver and whatever MCP SDK package is chosen) for any stdout write that isn't the deliberate JSON-RPC framing layer. Treat `console.log` as banned inside the MCP process for anything except the transport layer itself; redirect genuinely necessary diagnostic output to stderr. Confirm the chosen MCP SDK's stdio transport (if using `@modelcontextprotocol/sdk`'s `StdioServerTransport`) does not itself get confused by stray stderr output — stderr is conventionally safe for logs, but verify against the SDK version actually installed, not assumed from memory.
 
 **Warning signs:**
-- Any code path that calls `addNote()` with a payload assembled without first calling `getNote()`.
+Any `require()` of a module that calls `process.on('warning', ...)`, `console.log`, or writes to `process.stdout` at module-load time rather than inside an exported function. Protocol errors that only appear after several tool calls (suggesting a warning or lazy-loaded dependency, not an immediate bug).
 
 **Phase to address:**
-Same note-write path phase as Pitfall 1 — implement `updateNote()` as the single write helper and audit all `addNote()` call sites to go through it.
+Same phase as Pitfall 1 — audit transitively, not just the five command modules directly.
 
 ---
 
-### Pitfall 3: Treating history rewrite (filter-repo / BFG) as a way to remove a leaked secret from notes — it isn't, by default
+### Pitfall 3: Long-running process reuses `process.exit()` patterns designed for one-shot execution
 
 **What goes wrong:**
-If a secret does get written into `refs/notes/git-turn` (regex miss, or written before redaction runs — see Pitfall 5), the natural incident-response instinct is "rewrite history with `git filter-repo` or BFG Repo-Cleaner to scrub it," the same way teams handle a secret leaked in a commit message. That works for commits reachable from `refs/heads/*` and `refs/tags/*`, but **git notes live in their own ref (`refs/notes/git-turn`), which is itself a commit-history-shaped structure** (each note write is a new commit on that ref, per `notes.rewrite*` config semantics) that general-purpose history-rewriting tools do not process by default. Both the official `git-filter-repo` manual and its README (fetched directly) contain **zero mentions of `notes` or `refs/notes`** — it documents explicit handling for `refs/heads/*`, `refs/remotes/*`, tags, and `refs/replace/*`, but notes are conspicuously absent, meaning by default a leaked secret in a note **survives a filter-repo pass that the team believes cleaned their history**. BFG has the same class of gap (notes are not tree/blob content in the normal sense BFG's blob-stripping targets). This makes a secret leaked via `record-prompt` *stickier* than the same secret leaked in a commit message, precisely because the standard incident-response playbook doesn't cover it and nobody thinks to check.
+Every existing command module calls `process.exit(1)` liberally on error paths — confirmed in all of `bisect.js`, `blame.js`, `cost.js`, `diff.js`, `export.js`, `gc.js`, `init.js`, `log.js`, `record-prompt.js`, `redact.js`, `redo.js`, `revert.js`, `session.js`, `show.js`, `status.js` (dozens of call sites across the codebase). If any extracted data function — or a helper it still shares with the CLI path, like `readSession()` throwing and a `catch` block calling `process.exit(1)` — is invoked from an MCP tool handler, a single bad tool call (e.g. "not initialized" or "turn not found") kills the entire MCP server process, not just that one request. Every other open tool call in flight, and the client's whole session, dies with it.
 
 **Why it happens:**
-Notes are an unusual git feature most engineers (and most tooling) never interact with; rewrite tools are built and tested against the ref namespaces people actually rewrite (branches/tags). Notes fall outside that mental model entirely.
+`process.exit(1)` + a stderr message is the correct, idiomatic pattern for a CLI that should fail fast and set a shell-visible exit code. It is actively wrong for a server where "this specific request was invalid" must become a JSON-RPC error response, not a process death.
 
 **How to avoid:**
-- Document explicitly (README + a `record-prompt` help/warning) that `refs/notes/git-turn` is **not** cleaned by `git filter-repo`/BFG and requires manual remediation: delete/rewrite the note via `git notes remove` or `git notes add -f` with redacted content, **then** expire reflogs for that ref and run `git gc --prune=now` to actually drop the old blob — and even that only removes it locally; anyone who already fetched/pulled `refs/notes/git-turn` (if it's ever pushed — see Milestone context: currently local-only, but confirm this stays true) has a durable copy.
-- Because prevention is far cheaper than remediation here, this pitfall is the strongest argument for redaction being mandatory and pre-write (not a best-effort scan users can disable) — which the milestone already locks in as a requirement. Keep it that way; do not add an opt-out flag.
-- If/when `refs/notes/git-turn` is ever pushed to a remote (not in v0.3 scope per PROJECT.md, but likely later for team-shared audit trails), treat that as a much higher-severity version of this pitfall and gate it behind an explicit decision, not a default.
+The data functions extracted for Pitfall 1 must never call `process.exit()` — they should throw ordinary `Error` objects (or return a typed error/result) that the MCP tool handler catches and converts into an MCP error response. This means the extraction can't be a mechanical copy-paste of the existing `run()` body; every `process.exit(1)` call site needs to become a `throw`. Keep the CLI's own `run()` wrapper calling `process.exit()` as before — only the new data layer must be exit-free.
 
 **Warning signs:**
-- Any incident-response doc or runbook that says "run filter-repo to remove the leaked secret" without a separate step for notes refs.
-- `git turn` has no documented command/procedure for purging a specific note's history.
+Grep for `process.exit` reachable from any file imported by the MCP tool-handler module. An MCP client reporting "server disconnected" after a single malformed or edge-case tool call (e.g. asking for a turn number that doesn't exist) is the live symptom.
 
 **Phase to address:**
-Secret redaction phase — the *documentation and remediation procedure* for "what if a secret gets through anyway" should ship alongside the redaction feature itself, not be an afterthought. Treat "redaction failed, now what" as an in-scope requirement, not an edge case.
+Same extraction phase as Pitfall 1 — this is really one piece of work ("make the five commands' logic exit-free and stdout-free, callable as library functions") with three distinct failure modes, not three separate fixes.
 
 ---
 
-### Pitfall 4: Deleting/overwriting a note does not delete the secret — old note blobs and note-tree commits remain reachable
+### Pitfall 4: cwd/repo-scoping drift between server startup and per-call expectations
 
 **What goes wrong:**
-`refs/notes/<ref>` is backed by a commit-tree structure of its own (git literally stores notes as a tree keyed by object sha, committed to the notes ref). `git notes remove` or a redacting `git notes add -f` only moves the ref to a **new** notes-tree commit — the prior notes-tree commit (and the blob containing the leaked secret) remains a loose/reachable object via the notes ref's own reflog and via any other ref/tag that might reference it, until `git gc` runs with reflog expiry. In practice this means "I redacted it" is **not true** the moment redaction runs — it's only true after a GC that most users never think to run, and even then only locally. This is a sharper version of the general "git never really deletes anything" problem, but it's worse here than for commits because notes-tree history is even less visible to users than commit history (`git log refs/notes/git-turn` is not something anyone runs routinely).
+Every git-turn command resolves its target repo via `process.cwd()` — directly (`src/commands/init.js:85`, `src/commands/export.js:45`) or indirectly through `git.js`'s `gitSafe`/`repoRoot` helpers, which default `cwd: opts.cwd || process.cwd()` (`src/git.js:23`) and fall back to `process.cwd()` again if `rev-parse --show-toplevel` fails (`src/git.js:54`). A one-shot CLI's cwd is fixed for its entire (sub-second) lifetime. An MCP stdio server is a persistent process launched once by the client (e.g. Claude Code) and then receives many tool calls over its lifetime — its cwd is whatever it was at server launch, and nothing in Node changes it unless something explicitly calls `process.chdir()`. If the MCP client's own working directory changes between tool calls (e.g. the user or agent `cd`s to a different repo mid-session, or the MCP server is accidentally shared across multiple repos by a client that doesn't restart it per-repo), every tool call still silently resolves against the *original* launch-time repo, producing results for the wrong repository with no error — the exact "wrong commit sha, same shape of bug" class covered by Pitfall 5.
 
 **Why it happens:**
-Redaction naturally gets designed as "overwrite the bad content with a redacted version," which is correct for the *current view* (`git notes show`) but wrong for the *object store*, which is append-only until explicit GC.
+The milestone's own framing — "scoped to the cwd's repo (same scoping as every other `git turn` command today)" — treats cwd-scoping as free continuity from the CLI, but the CLI's cwd-per-invocation model and a server's cwd-per-process-lifetime model are not the same guarantee. The CLI re-reads cwd on every invocation (a new process each time); the server reads it once, at best, or on every tool call always returns the launch-time value if nothing ever calls `chdir()`.
 
 **How to avoid:**
-- Redact **before** the first write — never write raw prompt/response content to a note and redact afterward. This is the only approach that avoids ever creating the leaky object in the first place; everything else is remediation, not prevention.
-- For defense-in-depth, provide a documented `gc`-integrated remediation path (git-turn already has a `gc` command per PROJECT.md) that, given a commit sha, expires the relevant reflog entries for `refs/notes/git-turn` and force-runs `git gc --prune=now` — so if a secret does slip through, there's a supported one-command way to actually purge it, not just instructions to run raw git plumbing.
+Decide and document explicitly, before writing the server: cwd is captured once at `git turn mcp` startup and is immutable for the server's lifetime (simplest, matches "no `cd` tool exists in MCP" reality for most clients) — not re-read per call, since `process.cwd()` inside a tool handler returns the same value anyway unless something calls `chdir()`, which nothing should. Validate at startup (not per-call) that cwd resolves to a valid git-turn-initialized repo, and fail the server start loudly (stderr) rather than failing each tool call individually. If multi-repo support per server process is ever desired, that is a distinct, larger design (passing a repo path per tool call) — do not half-implement it by reading `process.cwd()` fresh per call and calling it "scoping."
 
 **Warning signs:**
-- Any redaction implementation that scans/redacts content and *then* calls `addNote()`, rather than redacting the string before it's ever passed to `addNote()`.
-- No existing `git turn` command for reflog-expire + prune scoped to the notes ref.
+Any test that starts the MCP server, changes directory, and then makes a tool call expecting the new directory to take effect. Any tool call result that doesn't match `git turn status` run manually in the directory the user believes is active.
 
 **Phase to address:**
-Secret redaction phase — redaction must sit directly in front of the write call (ideally inside `addNote`/`updateNote` itself, so no caller can bypass it), and the `gc` command should gain the purge capability in the same phase, not a later one.
+The MCP server bootstrap phase — cwd capture and startup-time repo validation should be the very first thing `git turn mcp` does, before registering any tools.
 
 ---
 
-### Pitfall 5: Regex/pattern-based detection (reused from warren) has real false-negative gaps against free-form prompt/response text
+### Pitfall 5: Reintroducing the snapshot-sha-vs-HEAD-sha notes lookup bug in a new code path
 
 **What goes wrong:**
-Warren's secret pattern list (per PROJECT.md, to be reused rather than reinvented) is very likely signature-based — recognizable prefixes/shapes like `AKIA[0-9A-Z]{16}`, `ghp_[A-Za-z0-9]{36}`, `sk_live_...`, generic `-----BEGIN PRIVATE KEY-----` blocks, etc. Those patterns were almost certainly designed against **structured contexts** (config files, `.env` diffs, commit content) where secrets appear as discrete tokens on their own line. Prompt/response capture is **unstructured conversational text** — a fundamentally different threat surface:
-- A user pastes a stack trace, error log, or `.env` file contents into a prompt with no recognizable key prefix (e.g. a bare 40-character hex token, a database connection string, an internal hostname+credential pair).
-- An LLM response paraphrases a secret in prose ("the password is `hunter2`" or "your API key `abc123...` looks malformed") — no fixed prefix, arbitrary surrounding text.
-- Multi-line secrets (PEM private key blocks) get missed if the scanner processes the note payload line-by-line rather than as one contiguous blob, or if newlines get normalized/escaped in JSON encoding before the scan runs.
-- Short, low-entropy secrets ("hunter2", a 6-digit PIN, an internal shared password) evade both pattern matching and entropy-based fallback detection, since entropy thresholds are tuned to avoid flagging normal English prose as a false positive.
-This is a structurally higher false-negative risk than warren's original use case, because the input distribution changed (code/config → freeform chat) even though the pattern list didn't.
+This exact bug class has already shipped and been fixed twice in this project's history (per `.planning/RETROSPECTIVE.md`'s v0.2 and v0.3 entries): `show.js`/`log.js`/`cost.js` looked up `refs/notes/git-turn` using the dangling *snapshot* commit sha instead of the real *HEAD* commit sha where the post-commit hook actually writes notes — so for weeks/months, `--with-prompts` and friends silently returned nothing even though the data existed. The fix (`parseSnapshotMessage(sha).headSha`, visible in `src/commands/log.js:52-55`) is now correctly applied in the existing CLI commands, but it is exactly the kind of easy-to-drop detail when a new consumer (an MCP tool handler) is built by someone who copies the "look up the turn, read its sha, fetch the note" shape without reading why `log.js` has that comment. A naive MCP `git_turn_show`/`git_turn_log`/`git_turn_cost` implementation that re-derives notes lookup from `listTurns()`'s raw `sha` field instead of routing through `parseSnapshotMessage()` would silently reintroduce the identical defect a third time — and because it returns an *empty* result rather than an error, it is exactly the kind of bug that passes unit tests against fixtures that don't exercise the real head/snapshot sha distinction.
 
 **Why it happens:**
-"Reuse warren's pattern list" is the right call for consistency and to avoid inventing a second secret taxonomy, but it creates an implicit assumption that patterns tuned for one input distribution (structured files) transfer cleanly to another (conversational text) without re-validation.
+`listTurns()` returns `{ turn_n, sha }` where `sha` is the *snapshot* ref target, not the HEAD commit — a naming/shape trap that has already fooled three separate command implementations in this codebase before being caught, per the retrospective's own "Key Lessons" ("A note-writer's own unit tests passing is not sufficient evidence that the readers consuming the same ref can actually see the data").
 
 **How to avoid:**
-- Explicitly re-test warren's pattern list against representative prompt/response samples (real agent transcripts, not synthetic examples) before shipping, specifically for: pasted `.env`/config blocks, multi-line key material, paraphrased secrets in prose, and short/low-entropy credentials.
-- Layer entropy-based detection as a supplement (not a replacement) to catch tokens that don't match known prefixes but look sufficiently random — accept some added false positives in exchange for narrowing the false-negative gap, and make the redaction placeholder clearly distinguishable so false positives are cheap to spot in review.
-- Scan the whole payload as one blob (post-JSON-decode, pre-JSON-encode) rather than per-line, so multi-line secrets aren't split across scan boundaries.
-- Document explicitly (in code comments and user-facing docs) that regex/entropy scanning is best-effort risk reduction, not a guarantee — this shapes expectations correctly and avoids treating "we redact secrets" as a security promise it can't keep.
+Do not write new sha-resolution logic for the MCP tools. The data-extraction work in Pitfall 1 should literally reuse the already-fixed resolution path from `log.js`/`show.js`/`cost.js` (which already call `parseSnapshotMessage(sha).headSha`) rather than re-deriving it against `listTurns()`'s raw output. If the extraction refactor produces a shared `resolveHeadSha(turn)` helper used by both the CLI and MCP paths, that is the correct outcome — one lookup implementation, two callers, matching this project's own established "one primitive, N consumers" pattern (`updateNote()`, `shouldColor()`, `reachableFrom()`).
+Follow this project's own established practice from the v0.3 retrospective: pair write-path and read-path verification with a live round-trip check (write a real note via the hook, then call the new MCP tool against it) rather than trusting unit tests against hand-built fixtures alone.
 
 **Warning signs:**
-- Redaction test suite only covers warren's original pattern examples, not prompt/response-shaped inputs.
-- No entropy-based fallback layer, or entropy thresholds copied verbatim from a config-file-scanning context without re-tuning.
+Any new MCP-specific helper that reads `listTurns()[i].sha` and passes it directly to a notes lookup without routing through `parseSnapshotMessage()`. An MCP tool call for `git_turn_show`/`git_turn_log` that returns turn metadata but an empty/missing prompt field for a turn that `git turn show <N> --with-prompts` (CLI) shows has a captured prompt.
 
 **Phase to address:**
-Secret redaction phase — pattern-list reuse should include an explicit validation step against realistic prompt/response fixtures, not just a direct import of warren's regex list.
-
----
-
-### Pitfall 6: Standard secret scanners (CI/CD tooling, GitHub push protection, gitleaks/trufflehog) generally don't scan `refs/notes/*` by default
-
-**What goes wrong:**
-Even if git-turn's own redaction has gaps (Pitfall 5), teams often rely on a second line of defense: CI-run secret scanners or platform-level push protection. Most of these tools walk the default ref glob (branches, sometimes tags) because that's where commit *content* — their actual target — lives; notes are a niche feature most scanners were never built to traverse. If a secret slips past git-turn's own redaction into a note, it may go completely undetected by the safety net teams assume is watching everything, creating a false sense of security specifically because this feature's storage location (notes) is outside the blast radius those tools cover.
-
-**Why it happens:**
-Secret scanners are built and marketed against "your commits/PRs," and notes are rarely on anyone's radar — including the scanner vendors'.
-
-**How to avoid:**
-- Do not market or document git-turn's redaction as a complement to "your CI secret scanner will also catch it" — state plainly that notes are largely outside standard scanner coverage, so git-turn's own pre-write redaction is the primary (often only) safety net for this data path.
-- If feasible, document a way for security-conscious teams to add `refs/notes/git-turn` to their own scanner's ref list (most scanners that support custom ref patterns can be pointed at it) as an optional hardening step, rather than assuming it happens automatically.
-
-**Warning signs:**
-- Redaction feature is documented/marketed as "defense in depth" implying other layers exist, when for this specific ref namespace they typically don't.
-
-**Phase to address:**
-Secret redaction phase — this is primarily a documentation/expectation-setting item, low implementation cost, but should ship with the feature so users don't develop a false sense of security.
-
----
+The data-extraction phase (same as Pitfalls 1 and 3) — explicitly require that extracted functions call the existing, already-fixed sha-resolution helper rather than reimplementing lookup logic, and require a live round-trip test (real hook-written note -> MCP tool call) as an exit criterion for this phase, mirroring the v0.3 audit's own methodology.
 
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|-----------------|------------------|
-| Blind `addNote()` overwrite for `record-prompt` (no read-modify-write merge) | Fastest path to a working demo | Silently drops `session_id`/`turn_n`/`snapshot_sha`, breaking `log`/cache joins | Never — this breaks core forensic linkage, not just an edge case |
-| Skip entropy-based fallback, ship pattern-only redaction | Less new code, faster ship | Higher false-negative rate on freeform prompt/response text (Pitfall 5) | Only as an explicit v0.3.0 limitation with a documented follow-up, never silently |
-| Defer the notes-purge remediation command (Pitfall 4) to "later" | Smaller initial scope | No supported recovery path if redaction fails once in production | Acceptable only if redaction-before-write is airtight *and* documented as the sole safety net in the interim |
+| Monkeypatch `console.log` around existing `run()` calls instead of extracting data functions | Fast to ship, no changes to existing commands | Fragile against nested/async writes, any dependency's own stdout write still corrupts the stream, doesn't fix `process.exit()` risk (Pitfall 3) | Never — this is the exact shape of bug this research exists to prevent |
+| Re-read `process.cwd()` fresh on every tool call instead of capturing at startup | "Feels" more correct/dynamic | Creates false confidence that per-call repo-switching works, when nothing actually changes cwd mid-process | Only acceptable if a `chdir`-capable tool is deliberately added later, with its own tests |
+| Skip the live round-trip test (real note write -> MCP read) and rely on hand-built fixtures only | Faster to write, matches normal unit-test style | This exact gap let the sha-resolution bug ship twice already in this codebase (v0.2, v0.3) | Never, for any tool touching `refs/notes/git-turn` |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
-|--------------|-----------------|--------------------|
-| `git notes add` | Assuming `-f` is "safe overwrite" with no side effects | Treat `-f` as "replace the visible note"; the prior blob still exists in the object store until GC — see Pitfall 4 |
-| `git filter-repo` / BFG | Assuming a history-scrub also cleans notes because it cleaned the commit that triggered the incident | Notes require separate, manual remediation (reflog expire + gc scoped to `refs/notes/git-turn`) — see Pitfall 3 |
-| warren's secret pattern list | Importing the regex list unchanged and assuming coverage transfers to prompt/response text | Re-validate against prompt/response-shaped fixtures; add entropy fallback — see Pitfall 5 |
-| CI secret scanners (gitleaks/trufflehog/push protection) | Assuming they cover `refs/notes/*` the same as commit content | Document that they typically don't; redaction-before-write is the primary control — see Pitfall 6 |
-
-## Performance Traps
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|-----------------|
-| Read-modify-write on every `record-prompt` call re-reading and re-parsing the full note via `getNote`/`JSON.parse` | Negligible at current scale (one shell-out + small JSON per call) | Not a concern at git-turn's expected scale (per-turn, human-triggered) — flagging only so it isn't "fixed" by removing the read step, which would reintroduce Pitfall 1 | N/A at this project's scale |
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|-------------|
-| Writing raw prompt/response content to the note, then redacting in a follow-up write | Secret blob already exists in object store, recoverable via reflog until GC | Redact before the first `addNote()` call ever happens — see Pitfall 4 |
-| Treating regex/entropy redaction as a guarantee rather than risk reduction | False confidence; users paste secrets assuming they're "safe" because git-turn "redacts secrets" | Document redaction as best-effort; validate against realistic fixtures — see Pitfall 5 |
-| Allowing an opt-out flag for redaction (e.g. `--no-redact`) "for convenience" | Turns a mandatory safety control into an easily-disabled one, and the milestone explicitly locks redaction as non-optional | Do not add a bypass flag; if performance/UX friction is a concern, address it without an opt-out |
-
-## UX Pitfalls
-
-| Pitfall | User Impact | Better Approach |
-|---------|--------------|-------------------|
-| Silent redaction with no indication anything was removed | User can't tell whether their prompt was captured faithfully or partially redacted, undermining trust in the audit trail | Emit a clear, low-noise indicator (e.g. `[redacted: 2 matches]` inline or a summary line on `record-prompt` output) when redaction fires |
-| `record-prompt` failing hard on a concurrent-write conflict with a raw git error | Confusing failure mid-session, may make users think the whole turn was lost | Retry transparently on lock/merge conflicts (Pitfall 1) a bounded number of times before surfacing a clear, actionable error |
+|-------------|----------------|-------------------|
+| MCP SDK stdio transport (e.g. `@modelcontextprotocol/sdk`'s `StdioServerTransport`) | Assuming the SDK "handles" stdout isolation for you, so any `console.log` elsewhere is fine | The SDK only owns the exact bytes it writes for JSON-RPC framing on stdout; it has no way to intercept or sandbox stdout writes from unrelated application code in the same process — isolation is the application's responsibility |
+| `node:sqlite` (`src/cache.js`) | Assuming the experimental-warning suppression (`process.removeAllListeners('warning')`) is harmless in a server context | It's stderr-only today (safe), but it's a global process-wide listener mutation done once at module load — confirm no other long-lived MCP code later needs its own `'warning'` listener, since this module already claims that global hook unconditionally |
+| `git` subprocess calls via `gitSafe`/`execFile` | Assuming stderr from spawned `git` is always suppressed | Several call sites explicitly pass `{ stdio: ['pipe', 'pipe', 'ignore'] }` to suppress stderr; others don't — in a persistent server, un-suppressed git stderr (e.g. a corrupt-ref warning) lands on the *server's* stderr, not a user's terminal, so review whether that's still the desired behavior once there's no human watching the terminal live |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **`record-prompt` writes note fields:** Often missing the read-modify-write merge — verify existing `session_id`/`turn_n`/`snapshot_sha` survive a `record-prompt` call on a commit the hook already annotated.
-- [ ] **Secret redaction:** Often tested only against warren's original config-file-style fixtures — verify against realistic prompt/response transcripts including multi-line and paraphrased secrets.
-- [ ] **Redaction failure remediation:** Often undocumented — verify there's an actual supported command/procedure for purging a leaked-then-redacted note from the object store, not just "we redact on write."
-- [ ] **Concurrent writer handling:** Often untested — verify behavior when `post-commit.js`'s hook and a `record-prompt` invocation race on the same commit sha (simulate with a tight-loop repro).
-- [ ] **`--with-prompts` output:** Often assumes redaction placeholders round-trip cleanly through JSON — verify redacted content doesn't break note JSON parsing or corrupt other fields.
-
-## Recovery Strategies
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|-----------------|-------------------|
-| Note fields clobbered by a race (Pitfall 1) | LOW | Recompute the note from the SQLite cache / op log (which independently records `session_id`/`turn_n`/`snapshot_sha` per `writeOp` calls in `post-commit.js`) and rewrite the note with `addNote -f` |
-| Secret leaked into a note before redaction is fixed (Pitfall 4/5) | HIGH | Redact the visible note immediately (`addNote -f` with a placeholder), then expire reflogs for `refs/notes/git-turn` and run `git gc --prune=now`; if the ref was ever pushed, treat as a full secret-rotation incident, not a git-cleanup task |
-| Filter-repo/BFG run assumed to have cleaned notes but didn't (Pitfall 3) | HIGH | Re-run the manual notes-specific purge procedure (Pitfall 4) after the fact — the filter-repo pass provides no coverage here and must not be trusted as a checkbox |
+- [ ] **Data extraction from `log`/`show`/`diff`/`blame`/`cost`:** Looks done once the MCP tool returns *some* JSON — verify it returns the same facts as the CLI command run against the same repo/turn, not just "doesn't crash"
+- [ ] **Error handling:** Looks done once a happy-path tool call works — verify an invalid turn number, an uninitialized repo, and a missing cache all produce a proper MCP error response, not a server crash (Pitfall 3)
+- [ ] **Prompt/note data in `git_turn_show`/`git_turn_log`/`git_turn_cost`:** Looks done once *a* prompt field appears for *some* turn — verify specifically against a turn whose note was written by the real post-commit hook + `record-prompt`, not a hand-built fixture, to catch Pitfall 5's bug class
+- [ ] **cwd scoping:** Looks done once the server works in the repo it happened to be launched in — verify behavior (ideally: a clear startup-time error) when launched outside any git-turn-initialized repo
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
-|---------|--------------------|----------------|
-| Note clobbering / lost-update race (Pitfall 1) | Note-write path / `record-prompt` implementation phase | Concurrency repro test: fire hook + `record-prompt` on same sha in a tight loop, assert all fields present afterward |
-| Missing "existing note" signal due to blanket `-f` (Pitfall 2) | Same note-write path phase | Unit test: `updateNote()` merges into an existing hook-written note rather than replacing it |
-| History-rewrite tools don't cover notes (Pitfall 3) | Secret redaction phase (docs + remediation procedure) | Manual test: run `git filter-repo` against a repo with a note containing a marker string, confirm it survives — document this explicitly |
-| Deleted/overwritten notes leave old blobs recoverable (Pitfall 4) | Secret redaction phase (redact-before-write + `gc` purge capability) | Object-store test: write raw secret, redact, `git gc --prune=now` with reflog expiry, confirm blob is unreachable |
-| Regex/pattern false negatives on freeform text (Pitfall 5) | Secret redaction phase (fixture validation + entropy fallback) | Test suite with realistic prompt/response fixtures (pasted `.env`, multi-line PEM, paraphrased secrets, low-entropy passwords) |
-| False sense of security from CI scanners not covering notes (Pitfall 6) | Secret redaction phase (documentation) | Docs review: redaction feature description explicitly states notes are outside typical scanner coverage |
+|---------|-------------------|---------------|
+| stdout pollution from reused command modules | Data-extraction phase (before any MCP tool handler is written) | Run the MCP server, pipe its stdout through a strict JSON-RPC line parser during the full tool-call test suite; any parse failure is a regression |
+| transitive dependency stdout/stderr writes | Same data-extraction phase | Audit `require()` graph of the five extracted functions for module-load-time console/stdout writes; add a lint rule or test that fails on `console.log` anywhere under the new MCP tool-handler path |
+| `process.exit()` reuse killing the server | Same data-extraction phase | Grep extracted functions for `process.exit`; integration test that an invalid tool call (bad turn number) returns an MCP error and the server is still alive for the next call |
+| cwd/repo-scoping drift | MCP server bootstrap phase | Test: start server in repo A, assert tool calls never pick up a cwd change; test: start server outside any initialized repo, assert a clear startup-time failure |
+| snapshot-sha-vs-HEAD-sha notes lookup regression | Same data-extraction phase | Live round-trip test: real commit -> post-commit hook writes note -> `record-prompt` -> MCP tool call reads back the same prompt/usage data the CLI equivalent shows |
 
 ## Sources
 
-- `git-scm.com/docs/git-notes` (fetched directly) — HIGH confidence: `git notes add` aborts without `-f` on existing note; `-f`/`copy -f` overwrite semantics; `notes.rewrite.<command>`, `notes.rewriteRef`, `notes.rewriteMode` (concatenate/overwrite/cat_sort_uniq/ignore) config for automatic note-copying during amend/rebase.
-- `git-filter-repo` README (github.com/newren/git-filter-repo, fetched directly) and its `Documentation/git-filter-repo.txt` manual (fetched directly) — MEDIUM confidence (absence-based): neither document mentions `notes` or `refs/notes` anywhere, despite explicitly documenting handling for `refs/heads/*`, `refs/remotes/*`, tags, and `refs/replace/*` — strong signal that notes are not part of filter-repo's default rewrite scope, but not independently confirmed by running filter-repo against a live repo with notes.
-- `src/git.js`, `src/hooks/post-commit.js` (this repo) — HIGH confidence for current behavior: `addNote()` is unconditionally `-f`; hook serialization is in-process only (`pending` promise chain), not cross-process; note payload today is a flat JSON object with no merge logic.
-- `.planning/PROJECT.md` — HIGH confidence for scope: redaction is a locked requirement for v0.3, reusing warren's pattern list, notes are local-only (no push scope) as of this milestone.
-- General git object-model behavior (notes-tree-as-commit-history, loose objects surviving ref updates until reflog expiry + gc) — LOW/MEDIUM confidence, training-data-based; not independently re-verified with a live repro in this research pass — recommend the object-store test in the Pitfall-to-Phase Mapping table above before relying on it for the redaction-remediation design.
-- BFG Repo-Cleaner notes-handling gap — LOW confidence, training-data-based only; no official BFG documentation was fetched in this research pass (not queried), included by analogy to filter-repo's confirmed gap since BFG operates on blob content, not notes-tree structure — flag for validation if BFG is specifically recommended in remediation docs.
+- `/Users/scowan/Projects/scottcowan/git-turn/.planning/RETROSPECTIVE.md` — v0.2 "What Was Inefficient" (notes `head` field bug), v0.3 "What Was Inefficient" and "Key Lessons" (sha-resolution bug shipped and sat silent through Phase 5's own verification)
+- `/Users/scowan/Projects/scottcowan/git-turn/src/commands/log.js` — direct `console.log` usage pattern (lines 17, 32, 34, 37, 48, 65, 68) and the already-fixed `parseSnapshotMessage(sha).headSha` resolution (lines 52-55)
+- `/Users/scowan/Projects/scottcowan/git-turn/src/git.js` — `shouldColor()` (NO_COLOR/FORCE_COLOR/isTTY gate, lines 11-17), `gitSafe` cwd defaulting (line 23), `repoRoot` cwd fallback (line 54)
+- `/Users/scowan/Projects/scottcowan/git-turn/src/cache.js` — module-load-time `process.on('warning', ...)` global listener mutation (lines 7-10)
+- `process.exit()` call-site survey across all 16 files in `/Users/scowan/Projects/scottcowan/git-turn/src/commands/*.js` (grep-verified, dozens of call sites) — HIGH confidence, directly observed in this codebase
+- MCP stdio transport stdout-exclusivity convention (JSON-RPC framing over stdout, logs must go to stderr) — MEDIUM confidence; this is well-established, widely documented MCP specification behavior from training knowledge, not independently re-verified against current `modelcontextprotocol.io` docs this session. Recommend a quick confirmation against the specific MCP SDK version pinned for this milestone before implementation.
 
 ---
-*Pitfalls research for: git-turn v0.3 (Prompt Capture + Secret Redaction)*
-*Researched: 2026-09-17*
+*Pitfalls research for: adding a stdio MCP server to the existing git-turn CLI*
+*Researched: 2026-10-07*

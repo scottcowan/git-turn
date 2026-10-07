@@ -1,249 +1,273 @@
 # Architecture Research
 
-**Domain:** git extension CLI — prompt/response capture integration (v0.3 milestone)
-**Researched:** 2026-09-17
-**Confidence:** HIGH (all claims verified directly against this repo's source; one MEDIUM-confidence gap flagged on the "reuse warren's secret pattern list" assumption)
+**Domain:** Node.js CLI tool adding a long-running MCP (Model Context Protocol) server addon to a short-lived, run-once-and-exit command dispatcher
+**Researched:** 2026-10-07
+**Confidence:** HIGH (all claims verified by reading this repo's source directly, plus live `npm view`/`npm pack` inspection of the current MCP TypeScript SDK; the only MEDIUM-confidence item is noted inline)
 
 ## Standard Architecture
+
+### The core tension
+
+Every existing `git turn <cmd>` module (`src/commands/log.js`, `show.js`, `diff.js`, `blame.js`, `cost.js`, etc.) follows the same shape: parse `args`, call `process.exit(1)` directly on any error path, `console.log` formatted output inline as it's computed, return `undefined` (or a `Promise` for `cost.js`'s async pricing fetch). `bin/git-turn` dispatches by `require`-ing the module and calling `.run(args)`, awaiting the result only to attach a `.catch` that itself calls `process.exit(1)`.
+
+That shape is fine for a process that runs once and exits — `process.exit(1)` just ends the one invocation. It is **actively dangerous** inside `git turn mcp`: the MCP server is one Node process handling an open-ended stream of tool calls over its lifetime, and a stray `process.exit(1)` reachable from a tool handler would kill the entire server (and silently drop every other in-flight or future tool call) over something as mundane as "turn 47 doesn't exist" or "repo not initialized." This is the single architectural fact that should drive every decision below.
 
 ### System Overview
 
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│ git commit (any agent)                                                │
-├───────────────────────────────────────────────────────────────────────┤
-│  post-commit hook (src/hooks/post-commit.js)                          │
-│   - createCheckpoint(): snapshotWorktree() -> commit-tree              │
-│   - updateRef(turnRef)                                                 │
-│   - addNote(NOTES_REF, head, {session_id,turn_n,snapshot_sha,ts})      │  <- FIRST note write, no prompt fields
-│   - insertTurn() into SQLite cache (meta: {} — prompt unknown here)    │
-├───────────────────────────────────────────────────────────────────────┤
-│  [NEW] git turn record-prompt   (invoked later, out-of-band, by agent)│
-│   - resolve target turn's real head sha (turnRef -> parseSnapshotMsg) │
-│   - redact(prompt), redact(response) via new src/redact.js            │
-│   - getNote(NOTES_REF, head) -> merge -> addNote(-f) SAME note, SAME  │  <- SECOND write, same ref/commit, read-merge-overwrite
-│     ref, SAME commit (git notes has no JSON-aware append; -f replaces │
-│     the whole note text, so record-prompt MUST read-merge-write or it │
-│     destroys session_id/turn_n/snapshot_sha/ts written by the hook)   │
-│   - updatePromptFields() — lightweight SQLite UPDATE (no diff redo)   │
-├───────────────────────────────────────────────────────────────────────┤
-│  refs/notes/git-turn   <-- SOURCE OF TRUTH (both writers target this) │
-│  SQLite cache.db       <-- derived, rebuildable index (never authority)│
-├───────────────────────────────────────────────────────────────────────┤
-│  log.js / show.js / cost.js                                           │
-│   cache-first (getTurns/getAllTurns) -> fallback to notes ref-walk    │
-│   (gitSafe notes show + JSON.parse) — --no-cache always hits this path│
-└───────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                         bin/git-turn (CLI entry)                   │
+├───────────────────────────────────────────────────────────────────┤
+│  COMMANDS = [..., 'mcp']  →  src/commands/mcp.js                   │
+│  (every other entry unchanged: require(cmdPath).run(args))         │
+├───────────────────────────┬───────────────────────────────────────┤
+│   One-shot commands        │   Long-running MCP server             │
+│   (existing, run-and-exit) │   (new, stays alive on stdio)         │
+│  ┌──────────────────────┐  │  ┌──────────────────────────────────┐ │
+│  │ src/commands/log.js   │  │  │ src/commands/mcp.js              │ │
+│  │   run(args)  — CLI,   │  │  │   run(args) — builds McpServer,  │ │
+│  │   console.log+exit    │  │  │   connects StdioServerTransport, │ │
+│  │   compute(args) — pure│◄─┼──┤   never calls process.exit       │ │
+│  │   data/string, throws │  │  └───────────────┬──────────────────┘ │
+│  └──────────────────────┘  │                  │                    │
+│  (same split applied to    │  ┌───────────────▼──────────────────┐ │
+│   show/diff/blame/cost)    │  │ src/mcp/tools/*.js (new)          │ │
+│                             │  │   one file per tool, registers   │ │
+│                             │  │   via server.registerTool(),     │ │
+│                             │  │   zod input schema, calls the    │ │
+│                             │  │   matching compute() above,      │ │
+│                             │  │   catches throws → isError:true  │ │
+│                             │  └───────────────┬──────────────────┘ │
+├─────────────────────────────────────────────────────────────────────┤
+│         src/git.js (execFile wrapper) · src/cache.js (SQLite)       │
+│         src/session.js · src/blame-util.js  — UNCHANGED, both       │
+│         call paths (CLI run() and MCP compute()) share these        │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| `src/hooks/post-commit.js` | Fires on every commit; writes snapshot + turn ref + **first** note write (session_id/turn_n/snapshot_sha/ts only) | Unchanged in this milestone — still writes `meta: {}` to cache; never sees prompt/model data (not known at commit time) |
-| `src/commands/record-prompt.js` (NEW) | Attaches prompt/model/latency_ms/usage to an *existing* turn's note, after the fact | New command file; read-merge-write into the same note; redact before write; best-effort cache update |
-| `src/redact.js` (NEW) | Content-level secret scanning of free-text prompt/response before it touches disk | Regex pattern list for secret-shaped substrings (API key prefixes, PEM headers, Bearer tokens, high-entropy runs) |
-| `src/git.js: addNote/getNote` | Generic git-notes plumbing (`git notes --ref=X add -f`, `git notes --ref=X show`) | Unchanged — reused as-is by record-prompt exactly as post-commit.js uses it |
-| `src/session.js: listTurns/turnRef` | Resolves turn_n -> snapshot sha -> (via blame-util's `parseSnapshotMessage`) real head sha | Unchanged — record-prompt reuses the exact resolution pattern `show.js`/`log.js` already use |
-| `src/cache.js` | Derived SQLite index; rebuildable from refs+notes; never authoritative | Add `usage` column + migration; add lightweight `updatePromptFields()`; `upsertTurn()` gains `usage` in its column list |
-| `log.js` / `show.js` / `cost.js` | Render turn data cache-first, notes-ref-walk fallback | **No changes required** for `--no-cache` correctness — see Data Flow below |
+| Component | Responsibility | Notes |
+|-----------|----------------|-------|
+| `bin/git-turn` | Dispatch table (`COMMANDS` array + `require`) | One new entry (`'mcp'`), zero structural change to the dispatch mechanism itself |
+| `src/commands/<cmd>.js` (refactored) | Exports **two** functions: `compute(args)` (pure-ish: resolves session/turns, returns a string or throws `Error`) and `run(args)` (CLI shell: calls `compute`, `console.log`s the result, catches thrown errors into `console.error` + `process.exit(1)`) | This is the one prerequisite refactor every tool handler depends on — see Build Order |
+| `src/commands/mcp.js` (new) | CLI entry point for `git turn mcp`; builds the `McpServer`, registers tools, connects `StdioServerTransport`, returns a `Promise` that only resolves on clean stdio close | Mirrors the existing async-command contract (`cost.js` already returns a `Promise` that `bin/git-turn` already knows how to await/catch) — no change needed to the dispatcher's promise-handling branch |
+| `src/mcp/server.js` (new, optional split) | Factory that constructs the `McpServer` instance and calls `registerTool` for each tool module | Keeps `mcp.js` itself thin; useful if `mcp.js` later needs argv parsing (e.g. a future `--http` transport) separate from server construction |
+| `src/mcp/tools/<name>.js` (new, one per tool) | Zod input schema + handler that calls the matching `compute()`, wraps the string result as `{ content: [{ type: 'text', text }] }`, and on a thrown `Error` returns `{ content: [...], isError: true }` instead of letting the exception escape | Each file is small and independently testable without starting a real stdio transport (handlers are plain async functions) |
+| `src/git.js`, `src/cache.js`, `src/session.js`, `src/blame-util.js` | Unchanged | Both the CLI path and the MCP path call into the exact same helpers — this is what guarantees `git turn log` and `git_turn_log` can never silently drift apart in behavior |
 
 ## Recommended Project Structure
 
 ```
 src/
 ├── commands/
-│   └── record-prompt.js     # NEW — the only new command file this milestone
-├── redact.js                 # NEW — content secret-scanner, used only by record-prompt.js
-├── hooks/
-│   └── post-commit.js        # UNCHANGED (still writes empty meta to cache)
-├── git.js                     # UNCHANGED — addNote/getNote reused as-is
-├── session.js                  # UNCHANGED — listTurns/turnRef reused as-is
-├── blame-util.js               # UNCHANGED — parseSnapshotMessage reused as-is
-├── cache.js                    # MODIFIED — usage column + migration + updatePromptFields()
-└── commands/
-    ├── log.js                  # UNCHANGED (already reads meta.prompt/model/latency_ms defensively)
-    ├── show.js                 # UNCHANGED (already reads meta.prompt/model/latency_ms defensively)
-    └── cost.js                 # UNCHANGED (already reads meta.usage defensively, --no-cache always — never touches SQLite cache today)
-bin/git-turn                   # MODIFIED — add 'record-prompt' to COMMANDS array + help text
+│   ├── log.js          # MODIFIED: split run() → run()+compute()
+│   ├── show.js         # MODIFIED: same split
+│   ├── diff.js         # MODIFIED: same split
+│   ├── blame.js        # MODIFIED: same split
+│   ├── cost.js         # MODIFIED: same split (compute() stays async)
+│   └── mcp.js          # NEW: `git turn mcp` CLI entry
+├── mcp/
+│   ├── server.js        # NEW: McpServer factory + tool registration
+│   └── tools/
+│       ├── log.js       # NEW: git_turn_log tool adapter
+│       ├── show.js       # NEW: git_turn_show tool adapter
+│       ├── diff.js       # NEW: git_turn_diff tool adapter
+│       ├── blame.js     # NEW: git_turn_blame tool adapter
+│       └── cost.js       # NEW: git_turn_cost tool adapter
+├── git.js               # unchanged
+├── cache.js             # unchanged
+├── session.js           # unchanged
+└── blame-util.js        # unchanged
 ```
 
 ### Structure Rationale
 
-- **No new storage primitive.** Prompt capture is bolted onto the existing single-note-per-commit model. There is no case for a second notes ref or an "append" note — `refs/notes/git-turn` already carries turn identity; record-prompt enriches the same object.
-- **`src/redact.js` is standalone**, not folded into `git.js` or `cache.js`, because it operates on plaintext application content (prompt/response strings), not git plumbing or SQL — keeping it separate makes it independently testable and reusable if a future MCP server (deferred to a later milestone) needs the same scanner.
-- **`cost.js` is a load-bearing existing consumer of `usage`** — it already does `meta.usage || null` and expects `{input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens}`. `record-prompt`'s `--usage` payload must match this shape exactly, or `cost.js` silently shows `?` for everyone. Note also: `cost.js` reads notes directly (`gitSafe(['notes', ..., 'show', sha])`) and **never touches the SQLite cache at all today** — it has no `--no-cache` flag because it has no cache path in the first place. This is a pre-existing inconsistency worth flagging to the roadmap (see Anti-Patterns), not something this milestone needs to fix.
+- **`src/mcp/` as its own top-level directory, not nested under `src/commands/`:** `src/commands/*.js` is a dispatch table keyed 1:1 to `bin/git-turn`'s `COMMANDS` array — each file there is a CLI verb. The MCP tools are not CLI verbs; they're a different protocol surface reusing the same compute logic. Keeping them in a sibling directory makes the reuse direction explicit (`src/mcp/tools/*` depends on `src/commands/*`, never the reverse) and avoids `bin/git-turn`'s `COMMANDS.includes(cmd)` guard ever accidentally matching a tool-adapter filename.
+- **One adapter file per tool under `src/mcp/tools/`,** not one monolithic tool-registration file: mirrors the existing one-file-per-command convention in `src/commands/`, keeps each tool's zod schema next to its handler, and means adding a 6th tool later (e.g. `git_turn_heatmap`, if a future milestone un-defers it) is "add one file + one `registerTool` call," not an edit to a growing switch statement.
+- **`compute()`/`run()` split lives inside the existing command files,** not in new parallel files: the alternative (duplicate the logic into `src/mcp/`) would require every future bugfix to be made twice and would already have drifted by the time `blame.js`'s untracked-file fallback path is touched again. Splitting in place is a few lines of diff per file (see Build Order) and keeps one source of truth.
 
 ## Architectural Patterns
 
-### Pattern 1: Read-merge-write note update (NOT append, NOT a new note)
+### Pattern 1: compute/run split (the prerequisite refactor)
 
-**What:** `git notes add -f` (the only write primitive `addNote()` exposes) replaces the entire note body for a commit. Because the post-commit hook has already written `{session_id, turn_n, snapshot_sha, ts}` on the head commit by the time `record-prompt` runs, a naive `addNote()` call from `record-prompt` would silently destroy those fields.
+**What:** Extract each command's existing logic into a `compute(args)` function that returns the final string (or, for async `cost.js`, a `Promise<string>`) and **throws** `Error` instead of calling `console.error` + `process.exit(1)`. The existing `run(args)` becomes a thin wrapper: call `compute`, `console.log` the result, and on a caught `Error`, do exactly what it does today (`console.error`, `process.exit(1)`).
 
-**When to use:** Every subsequent write to a commit's note in this system, present and future (e.g. if a later milestone adds more fields).
+**When to use:** Before any MCP tool is wired up — this is a hard prerequisite, not a nice-to-have, because of the `process.exit` hazard above.
 
-**Trade-offs:** Small TOCTOU window between the `getNote` read and the `addNote` write in `record-prompt` — acceptable because record-prompt is a single, deliberate CLI invocation per turn (not high-frequency like the hook), and losing the race just means "invoke it again." No process-level lock is justified for this milestone.
+**Trade-offs:** Low risk, mechanical refactor — the formatted-text-building logic in `log.js`/`show.js`/`diff.js`/`blame.js`/`cost.js` is already structured as "build a string, print it," so most of the diff is replacing `console.log(x)` with `lines.push(x)` (or template-literal concatenation) and `return lines.join('\n')` at the end, plus `process.exit(1)` → `throw new Error(...)`. The CLI-visible behavior (stdout content, exit codes) should be byte-for-byte identical before and after — this refactor has no reason to change what `git turn log` prints, only how the module exposes that computation internally. Existing tests for each command should pass unmodified if this invariant holds; that invariant is itself the acceptance criterion for the refactor.
 
-**Example (record-prompt.js core logic):**
-```javascript
-const { getNote, addNote } = require('../git');
-const { NOTES_REF } = require('../session');
-const { redact } = require('../redact');
-
-function attachPrompt(headSha, { prompt, model, latencyMs, usage }) {
-  const existing = getNote(NOTES_REF, headSha);
-  let payload = {};
-  try { payload = existing ? JSON.parse(existing) : {}; } catch {}
-
-  payload.prompt = prompt !== undefined ? redact(prompt) : payload.prompt;
-  payload.model = model !== undefined ? model : payload.model;
-  payload.latency_ms = latencyMs !== undefined ? latencyMs : payload.latency_ms;
-  payload.usage = usage !== undefined ? usage : payload.usage;
-
-  addNote(NOTES_REF, headSha, JSON.stringify(payload)); // still -f under the hood — full overwrite of the MERGED object
-  return payload;
+**Example (shape, not literal diff):**
+```js
+// src/commands/log.js — after refactor
+function compute(args) {
+  const session = readSession();
+  if (!session) throw new Error('git turn: not initialized. Run `git turn init` first.');
+  // ...identical logic as today, but push to an array instead of console.log...
+  return lines.join('\n');
 }
+
+function run(args) {
+  try {
+    console.log(compute(args));
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
+}
+
+module.exports = { run, compute };
 ```
 
-### Pattern 2: Resolve target turn by session state, not bare HEAD
+### Pattern 2: MCP tool adapter = thin wrapper around `compute()`
 
-**What:** `record-prompt` runs *after* the commit it's annotating, as a separate process invocation. By the time it runs, `git rev-parse HEAD` may no longer equal the commit the prompt belongs to (the agent could have made another commit, or `record-prompt` could be invoked with a delay). The command must resolve the target turn the same way `show.js`/`log.js`'s fallback path already does:
+**What:** Each `src/mcp/tools/<name>.js` registers a tool whose handler calls the matching `compute()`, returns its string as MCP `content`, and converts a thrown `Error` into `{ content: [...], isError: true }` (the SDK's documented recoverable-failure shape) rather than letting it propagate and crash the server process.
 
+**When to use:** For every read-only tool in this milestone's scope (`git_turn_log`, `_show`, `_diff`, `_blame`, `_cost`).
+
+**Trade-offs:** Returning the exact same formatted text the CLI prints (not a re-parsed structured object) is the pragmatic choice here: `log`/`show`/`diff`/`blame` output is inherently diff/table text with no existing structured representation, and building a parallel JSON schema for "a git diff" would be new scope with no current consumer. The milestone's own framing — "mirroring the existing CLI commands' output" — confirms text-mirroring is the intended contract, not a structured API. The cost of this choice: if a future milestone wants MCP clients to do their own structured reasoning over turn data (e.g. "which turns touched this file" as a list, not formatted text), that's a new, separate tool design question, not a retrofit of these five adapters.
+
+**Example:**
+```js
+// src/mcp/tools/log.js
+const { z } = require('zod');
+const { compute } = require('../../commands/log');
+
+function register(server) {
+  server.registerTool(
+    'git_turn_log',
+    {
+      description: "List turns in the current session (mirrors `git turn log`)",
+      inputSchema: z.object({
+        withPrompts: z.boolean().optional().describe('Include first line of captured prompt per turn'),
+        noCache: z.boolean().optional().describe('Bypass the SQLite read cache'),
+      }),
+    },
+    async ({ withPrompts, noCache }) => {
+      const args = [withPrompts && '--with-prompts', noCache && '--no-cache'].filter(Boolean);
+      try {
+        return { content: [{ type: 'text', text: compute(args) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: e.message }], isError: true };
+      }
+    }
+  );
+}
+
+module.exports = { register };
 ```
-session = readSession()
-turnN = args.turn ?? session.turn_n        // defaults to the latest turn in the active session
-{ sha: snapshotSha } = listTurns(session.session_id).find(t => t.turn_n === turnN)
-{ headSha } = parseSnapshotMessage(snapshotSha)   // from src/blame-util.js — the snapshot commit's own message body, NEVER the note
-```
 
-**When to use:** Always — never call `headSha()` from `git.js` directly inside record-prompt for target resolution. `git.js:headSha()` returns the *current* HEAD at invocation time, which is exactly the value that's already wrong once a second commit has landed.
+### Pattern 3: stdio server lifecycle inside the existing dispatcher
 
-**Trade-offs:** None — this is strictly correct and mirrors `blame-util.js`'s own comment: *"refs/notes/git-turn has never carried a `head` field... relying on notes' `head` left log.js's --no-cache path and show.js showing the wrong commit."* The same landmine applies to record-prompt if it resolves the target commit incorrectly.
+**What:** `src/commands/mcp.js`'s `run(args)` builds the server, calls `await server.connect(transport)`, and returns the resulting (long-lived) promise. `bin/git-turn` already has a branch for this: `if (result && typeof result.then === 'function') result.catch(err => {...; process.exit(1)})` — written originally for `cost.js`'s pricing fetch, it works unmodified for a server connection that only settles on transport close/error.
 
-### Pattern 3: Cache is a derived index — never the write path of record
+**When to use:** This is the only way `git turn mcp` fits into the existing one-`require`-one-`run()` dispatch model without touching `bin/git-turn`'s dispatch mechanism at all — only its `COMMANDS` array and `--help` text need a new line.
 
-**What:** `insertTurn()`/`upsertTurn()` in `src/cache.js` already recompute `git diff --numstat` against the previous snapshot on every call — appropriate for the hook (new turn, diff stats genuinely unknown), wasteful for record-prompt (diff stats are unchanged; only metadata is new).
-
-**When to use:** Add a narrow `updatePromptFields(sessionId, turnN, { prompt, model, latencyMs, usage })` that does a plain `UPDATE turns SET prompt=?, model=?, latency_ms=?, usage=? WHERE session_id=? AND turn_n=?` — no numstat recomputation, no `turn_files` touch. Call it from `record-prompt` in the same best-effort `try {} catch {}` style the hook already uses around `insertTurn()`.
-
-**Trade-offs:** If the cache row doesn't exist yet (e.g. cache was never built, or `--no-cache` users never triggered a rebuild), the UPDATE affects 0 rows and is silently a no-op — acceptable, because the note (source of truth) already has the data, and the next `git turn gc --rebuild` will pick it up via the existing `rebuild()` -> `upsertTurn()` path once `usage` is added to that function's column list (see Data Flow).
+**Trade-offs:** None significant — the existing promise-aware dispatch branch was already general enough. The one thing to verify explicitly during implementation: confirm `server.connect(transport)`'s promise genuinely doesn't resolve until the stdio stream closes (per the SDK's `serveStdio`/`connect` contract) rather than resolving immediately after the handshake — otherwise `bin/git-turn`'s script would reach end-of-file and Node would exit despite stdin still being open. (MEDIUM confidence on this specific resolution timing — verify empirically in Phase B below with a manual stdio smoke test before building tools on top of it.)
 
 ## Data Flow
 
-### Write Flow (two independent writers, one shared object)
+### Request Flow (one MCP tool call)
 
 ```
-git commit
-    ↓
-post-commit.js: createCheckpoint()
-    ↓
-addNote(NOTES_REF, head, {session_id, turn_n, snapshot_sha, ts})   <- write #1, full payload at this point
-insertTurn({ ..., meta: {} })  → cache row created, prompt/model/latency_ms/usage = NULL
-    ↓
-    ... time passes, agent gets a response ...
-    ↓
-git turn record-prompt --prompt "..." --model "..." --latency-ms N --usage '{"input_tokens":..}'
-    ↓
-resolve headSha for target turn (session.turn_n or --turn N, via listTurns + parseSnapshotMessage)
-    ↓
-redact(prompt) via src/redact.js  (MUST happen before any disk/ref write)
-    ↓
-getNote(NOTES_REF, headSha) → parse → merge new fields into existing payload
-    ↓
-addNote(NOTES_REF, headSha, mergedPayload)   <- write #2, same ref, same commit, full overwrite of MERGED object
-    ↓
-updatePromptFields(sessionId, turnN, {...})  → best-effort cache UPDATE, no diff recompute
+MCP client (e.g. Claude Code)
+    │  JSON-RPC tool-call over stdio
+    ▼
+McpServer (src/mcp/server.js) — routes by tool name
+    │
+    ▼
+src/mcp/tools/log.js handler — validates args via zod, builds CLI-style argv array
+    │
+    ▼
+src/commands/log.js compute(args) — readSession() [fs read] → cache.getTurns() [SQLite query,
+    │                                 reusing the already-open process-lifetime DB handle]
+    │                                 → falls back to listTurns()+git plumbing if cache empty
+    ▼
+returns formatted string, or throws Error
+    │
+    ▼
+tool handler wraps as { content: [...] } or { content: [...], isError: true }
+    │  JSON-RPC tool-result over stdio
+    ▼
+MCP client renders content to the model
 ```
 
-### Read Flow (cache-first, notes fallback — unaffected by this milestone)
+### Why the long-running process changes nothing about cache correctness
 
-```
-log.js / show.js:
-  if (!noCache) { try cache.getTurns()/getTurnFiles() ... return if hit }
-  → fallback: listTurns() [git ref-walk] + getNote()/gitSafe(notes show) [git object read] + JSON.parse
-```
+`src/cache.js` already has a module-level `_db` singleton (`let _db = null`, populated by `openDb()` and never closed until explicit `closeDb()`). Every existing CLI invocation opens a *fresh* process, so in practice `_db` has only ever lived for the duration of one command. Inside `git turn mcp`, `_db` instead lives for the server's entire session — this is a **benefit**, not a hazard: it avoids repeatedly reopening the SQLite file per tool call. It introduces no staleness risk because every query (`getTurns`, `getAllTurns`, `getTurnsForFile`) issues a fresh `SELECT` against the open handle on each call, and SQLite's own file-level transaction semantics mean a `SELECT` sees whatever the last committed writer (e.g. the post-commit hook, firing in a separate `git commit` process while the agent keeps working during the same live MCP session) wrote — no manual invalidation or reconnect logic is needed. This is the same cache-first guarantee every CLI command already relies on; the MCP server just gets to amortize the `openDb()` cost across many calls instead of paying it once per call.
 
-Because record-prompt writes into the *same note object* the hook created, both paths — cache (once `updatePromptFields`/`upsertTurn` carry `usage`) and the notes ref-walk fallback (already JSON.parses the full note, already reads `meta.prompt`/`meta.model`/`meta.latency_ms` defensively in `log.js`/`show.js`, already reads `meta.usage` in `cost.js`) — see identical data with zero changes required to the fallback branches themselves. **This is the key answer to "won't break --no-cache":** the fallback was already written defensively for these fields before record-prompt existed (per PROJECT.md: "read defensively where present but nothing shipped writes them yet") — record-prompt is the first thing that finally writes what those paths were already prepared to read.
+### `--no-cache` fallback pattern, reused verbatim
 
-### Key Data Flows
+Nothing about `--no-cache` is cache-specific to the CLI — it's a parameter on `compute(args)` exactly as it is on `run(args)` today (`args.includes('--no-cache')`). The MCP tool adapters expose it as an optional `noCache: z.boolean().optional()` input and translate it into the same `'--no-cache'` string the CLI parser already understands (see Pattern 2's example) rather than inventing a second parsing path. This is the one piece of real design leverage from the compute/run split: the *same* argv-shaped array that `bin/git-turn` constructs from `process.argv` is exactly what an MCP tool handler constructs from its validated zod input — one parsing contract, two callers.
 
-1. **Note enrichment:** One note per commit, two writers across time (hook writes structural fields synchronously at commit time; record-prompt writes content fields asynchronously afterward) — reconciled by read-merge-write, never by a second note or `git notes append`.
-2. **Cache enrichment:** Cache mirrors whatever the note currently contains. A cache row can legitimately go through two lifecycle states — "structural only" (right after commit) then "full" (after record-prompt) — and `rebuild()` from a cold cache produces the "full" state directly in one pass since it reads the note only once, after both writers have already run.
+### Repo scoping — fixed for the server's whole lifetime, by construction
+
+Every `src/git.js` helper defaults `cwd` to `process.cwd()`. For one-shot CLI commands this means "whichever directory you ran `git turn` from"; for `git turn mcp` it means "whichever directory the MCP client spawned the `git turn mcp` subprocess from," fixed for as long as that subprocess lives (Node's `process.cwd()` never changes without an explicit, never-called `process.chdir()`). This requires no new code — it falls out of reusing `src/git.js` unchanged — but is worth stating explicitly in the tool/server documentation: an MCP client wanting multi-repo coverage spawns one `git turn mcp` process per repo (the normal pattern for stdio MCP servers, one process per client-configured server entry), not one process asked to switch repos mid-session.
 
 ## Scaling Considerations
 
 | Scale | Architecture Adjustments |
 |-------|--------------------------|
-| Single developer, single repo | Current design is sufficient — one note write per commit, one enrichment write per record-prompt call, negligible overhead |
-| Many sessions / long history | `git notes` reads/writes are O(1) per commit regardless of history size (notes are stored as their own tree, not scanned) — no adjustment needed |
-| `gc --rebuild` on large histories | Already walks all `refs/git-turn/sessions/` refs and re-reads every note once — adding `usage` to the column list adds no new git calls, just one more JSON field parsed per note already being parsed |
-
-### Scaling Priorities
-
-1. **First bottleneck:** None introduced by this milestone — record-prompt is a single additional git-notes round trip per turn, same cost class as the hook's own note write.
-2. **Second bottleneck:** N/A at this scale.
+| Single repo, one MCP client session (the only case this milestone targets) | Current design handles this directly — no changes needed beyond what's described above |
+| Multiple concurrent tool calls in flight on one server | The MCP SDK dispatches each tool call as its own async handler invocation; `src/git.js`'s `execFileSync` calls are synchronous and block the event loop for their duration (true today for the CLI too — a `git diff` on a huge turn already blocks that one process). Not a new risk introduced by this milestone, but worth flagging if a *future* milestone adds a tool whose `compute()` does something slow and concurrent calls pile up — not a concern for `log`/`show`/`diff`/`blame`/`cost`, which are each one or a handful of fast git subprocess calls |
+| A future write/destructive tool (explicitly out of scope this milestone: `revert`, `bisect`, `redact`, `record-prompt`) | Deferred by the milestone itself specifically because no confirmation/dry-run pattern exists yet for MCP tool calls — correctly scoped out, not an oversight; don't retrofit it into this phase |
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Writing a second note or using `git notes append` for prompt data
+### Anti-Pattern 1: Shelling out from the MCP server to the CLI and parsing stdout
 
-**What people do:** Reach for `git notes append` (git's own append primitive) thinking it avoids the read-merge-write dance.
-**Why it's wrong:** `git notes append` concatenates raw *text* blobs — it has no concept of JSON structure, so appending would produce a note body that is no longer valid JSON (`{...}{"prompt":...}`), breaking every existing reader (`log.js`, `show.js`, `cost.js`, `cache.js`'s `rebuild()`) which does `JSON.parse(note)` unconditionally in a try/catch that would now silently swallow the parse failure and fall back to `meta = {}`.
-**Do this instead:** Read the note, `JSON.parse`, merge in-memory, `addNote(..., '-f', ...)` the merged object back — exactly what post-commit.js already does for the *first* write; record-prompt just needs to read first.
+**What people do:** Have each `src/mcp/tools/*.js` handler `execFileSync('git', ['turn', 'log', ...])` (or spawn `bin/git-turn` directly) and parse the captured stdout back into whatever shape the tool wants to return.
 
-### Anti-Pattern 2: Resolving the note target via `headSha()` (current HEAD) instead of the turn's recorded head
+**Why it's wrong:** This milestone's own target feature list says the tools should "mirror the existing CLI commands' output" — shelling out would technically satisfy that by construction, so it's tempting. But it: (1) pays a full `fork+exec` cost (plus a second cold SQLite `openDb()`) on every single tool call, discarding exactly the long-running-process benefit a server exists to provide; (2) requires re-parsing already-formatted display text (padded columns, truncated-to-50-chars subject lines) back out, which is strictly more fragile than calling the function that produced that text in the first place — any future formatting tweak (e.g. widening a column) now has to stay parseable by a regex nobody will remember exists; (3) loses the in-process error signal — a non-zero exit code from a child process has to be re-interpreted into an `isError` MCP result, when the parent process already has the real `Error` object available for free if it calls the function directly instead of shelling out to its own CLI wrapper around that function.
 
-**What people do:** Assume record-prompt is always invoked immediately after the relevant commit, so `git rev-parse HEAD` is "close enough."
-**Why it's wrong:** Agents frequently make several commits before a turn boundary is reported back (or the CLI invocation is delayed), and `blame-util.js`'s own comments document a prior incident where exactly this class of bug ("relying on notes' `head`... left log.js's --no-cache path and show.js showing the wrong commit") shipped and had to be fixed by parsing the snapshot commit's message body instead.
-**Do this instead:** Always resolve via `listTurns(sessionId)` → matching `turn_n` → `parseSnapshotMessage(snapshotSha).headSha`, the same helper `show.js`/`log.js`/`blame-util.js` already centralize this logic in.
+**Do this instead:** `require()` the sibling `src/commands/<name>.js` module and call its `compute()` function in-process (Pattern 2 above). Same codebase, same process, zero subprocess overhead, and the "mirrors CLI output" requirement is satisfied exactly because both paths call the identical function.
 
-### Anti-Pattern 3 (pre-existing, flag for roadmap awareness, not this milestone's job to fix): `cost.js` bypasses the cache entirely
+### Anti-Pattern 2: Leaving `process.exit()` reachable from any code path a tool handler can trigger
 
-**What people do (already shipped):** `cost.js` reads notes directly via `gitSafe(['notes', ...])` for every turn, with no cache-first branch and no `--no-cache` flag — inconsistent with `log.js`/`blame.js`/`bisect.js`, which are all cache-first with fallback.
-**Why it's wrong:** Not wrong today (cost.js correctness is unaffected either way, since notes are always the source of truth) but it means `cost.js` gets zero benefit from the SQLite cache's speed, and its behavior can never be told to skip the cache because it never uses one — a latent inconsistency, not a bug.
-**Do this instead:** Out of scope for v0.3 prompt capture. Worth a small follow-up ticket to make `cost.js` cache-first like its siblings once `usage` is a first-class cache column (this milestone adds exactly that column, which is what would unblock the follow-up).
+**What people do:** Register tools against the *existing* `run(args)` functions without first doing the compute/run split, reasoning "it already does the right thing for the CLI, why touch it."
+
+**Why it's wrong:** Every existing command's error path is `console.error(...); process.exit(1)`. If a tool handler calls `run()` directly, the very first "turn 999 not found" or "not initialized" error a user hits via an MCP client kills the whole server process — including every other tool call that might be in flight, and silently, from the client's point of view (the stdio pipe just dies). This is not a hypothetical: `show.js`, `diff.js`, and `log.js` all hit this path on ordinary, expected user input (an out-of-range turn number), not just on bugs.
+
+**Do this instead:** The compute/run split (Pattern 1) is the fix, and it's a correctness prerequisite, not a style preference — build it first, and treat "no `process.exit` call is reachable from anything under `src/mcp/`" as an explicit acceptance check (e.g. a quick `grep -r process.exit src/mcp/` returning nothing) before shipping the server.
 
 ## Integration Points
 
-### External Services
+### External Services / Dependencies
 
-None. This milestone is entirely local (git object store, git notes, SQLite file) — no network calls, matching the existing "no server required" key decision in PROJECT.md.
+| Service / Package | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| `@modelcontextprotocol/server` (new runtime dependency — **git-turn's first ever**, per-`npm view` 2026-10-07) | `require('@modelcontextprotocol/server')` for `McpServer`, `require('@modelcontextprotocol/server/stdio')` for `StdioServerTransport` | Ships both CJS (`.cjs`) and ESM (`.mjs`) builds (`"exports"` map verified via `npm pack` on `2.3.1`), so it `require()`s cleanly from this CommonJS codebase with no build-step or `"type": "module"` change needed anywhere in git-turn. Its own dependency footprint is minimal: only `zod` and `@modelcontextprotocol/core` (which itself depends only on `zod`) — no `express`/`hono`/`cors` pulled in, because those live in the separate, heavier legacy `@modelcontextprotocol/sdk` (v1.x) package, which bundles every transport (HTTP, SSE, stdio) and is **not** what this milestone needs (stdio only) |
+| `zod` (new, direct dependency — required because tool input schemas are authored in git-turn's own code, not just transitively needed by the SDK) | `require('zod')` (root export is Zod v4 as of `4.6.5`) | Must satisfy the SDK's peer requirement (`^4.2.0` for `@modelcontextprotocol/server@2.3.1`/`core@2.3.1`) — pin `zod` explicitly in `package.json` rather than relying on it resolving only as a transitive dependency, since git-turn code calls `z.object(...)` directly in every `src/mcp/tools/*.js` file |
+
+**This reverses, deliberately and narrowly, the project's longstanding zero-new-npm-dependency posture** (previously upheld even for the secret-redaction scanner, which was hand-vendored rather than importing `secretlint`/`gitleaks-node`). That precedent was about a *small, self-contained, easily-hand-written* feature (regex + Shannon entropy, ~150 lines). Hand-rolling a JSON-RPC 2.0 framed stdio transport plus the full MCP capability-negotiation handshake is a different order of scope entirely — doing that by hand would be the actual architectural mistake here, not taking the dependency. Scope the dependency narrowly: only `@modelcontextprotocol/server` + its `/stdio` subpath export, not the heavier `@modelcontextprotocol/sdk` package, and only `zod`, not `zod-to-json-schema`/`ajv`/etc. (those live inside the SDK's own dependency tree already, where needed).
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `bin/git-turn` ↔ `src/commands/record-prompt.js` | Direct `require().run(args)` dispatch, identical to every existing command | Add `'record-prompt'` to the `COMMANDS` array and the `--help` text block; no dispatcher logic changes needed |
-| `record-prompt.js` ↔ `src/git.js` | `getNote`/`addNote` (existing exports, unchanged signatures) | Confirmed `addNote()` always passes `-f`; record-prompt relies on this to overwrite the merged payload |
-| `record-prompt.js` ↔ `src/session.js` / `src/blame-util.js` | `readSession()`, `listTurns()`, `parseSnapshotMessage()` (existing exports, unchanged signatures) | Reuses the exact turn-resolution pattern `show.js` already implements — no new resolution logic needed, just import the existing helper |
-| `record-prompt.js` ↔ `src/redact.js` (NEW) | Direct function call, `redact(text) -> string` | Must run before any I/O — redact in-memory, then write |
-| `record-prompt.js` ↔ `src/cache.js` | New `updatePromptFields()` export, called best-effort inside `try {} catch {}` | Never throws into the caller — matches the hook's own `try { insertTurn(...) } catch {}` discipline exactly |
-| `src/cache.js` `openDb()` ↔ existing `cache.db` files | Schema migration: `usage TEXT` column must be added via a guarded `ALTER TABLE` (checked against `PRAGMA table_info(turns)` or wrapped in try/catch), since `CREATE TABLE IF NOT EXISTS` does not retrofit columns onto an already-existing table | Without this, users with a pre-v0.3 `cache.db` get a SQL error the first time `upsertTurn()`/`updatePromptFields()` references the `usage` column |
-| `record-prompt.js` ↔ `src/commands/cost.js` (indirect, shape contract) | `--usage` JSON must match `{input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens}` | Verified by reading `cost.js`'s `computeCost()` — any other shape silently produces `cost === null` for that turn with no error surfaced |
+| `src/mcp/tools/*.js` ↔ `src/commands/*.js` | Direct `require()` + function call (`compute(args)`) | One-directional dependency; `src/commands/*` must never `require('../mcp/...')` |
+| `src/commands/mcp.js` ↔ `src/mcp/server.js` | Direct `require()` — `mcp.js` is the CLI-facing shell, `server.js` is the reusable factory | Matches the existing convention where `src/commands/*.js` is a thin CLI shell around logic that could in principle be called from elsewhere (here, "elsewhere" is realized for the first time) |
+| `bin/git-turn` ↔ `src/commands/mcp.js` | Unmodified dispatch mechanism (`require(cmdPath).run(args)`, promise-aware `.catch`) | Zero changes to `bin/git-turn` beyond adding `'mcp'` to `COMMANDS` and a `--help` line |
 
-## Gap Flagged: "Reuse warren's secret pattern list" needs adjustment
+## Build Order
 
-**Confidence: MEDIUM** (verified by reading warren's source directly, not assumed).
+This is the one place where sequencing matters more than usual: **the compute/run refactor is a hard prerequisite for every tool handler**, not independent parallel work.
 
-Investigated `/Users/scowan/Projects/scottcowan/warren/packages/warren-common/src/warren_common/logging.py` (`redact_processor`) and `secrets.py`. Warren's only redaction mechanism is a **structured key-name matcher**: it redacts a `structlog` event-dict value if its *key* is exactly `TOKEN`/`KEY`/`SECRET`/`PASSWORD` or ends with `_TOKEN`/`_KEY`/`_SECRET`/`_PASSWORD` (case-insensitive), plus a blanket rule for any dict stored under the literal key `env`. It has **no regex list for secret-shaped *content*** (no AWS `AKIA...`, no GitHub `ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`, no Slack `xox[baprs]-`, no PEM headers, no high-entropy heuristic) — and it's Python, not directly importable into this Node.js codebase regardless.
+1. **Phase A — Refactor existing commands to separate `compute()` from `run()`.** Touches `src/commands/log.js`, `show.js`, `diff.js`, `blame.js`, `cost.js`. No new files, no new dependencies. Acceptance check: existing CLI behavior (stdout, exit codes) is byte-for-byte unchanged — run the existing test suite and confirm it passes with zero test-file edits.
+2. **Phase B — MCP server scaffold with zero tools registered.** Add `@modelcontextprotocol/server` + `zod` to `package.json`, add `src/mcp/server.js` (empty `registerTool` set) and `src/commands/mcp.js`, wire `'mcp'` into `bin/git-turn`'s `COMMANDS` array and `--help` text. Acceptance check: manually smoke-test that `git turn mcp` starts, stays alive on stdin, and exits cleanly on stdin close/SIGINT — this also resolves the one MEDIUM-confidence open question (Pattern 3) about `server.connect()`'s promise-resolution timing, before any tool logic depends on it.
+3. **Phase C — Register the five read-only tools.** Add `src/mcp/tools/log.js`, `show.js`, `diff.js`, `blame.js`, `cost.js`, each calling its Phase-A `compute()`. Acceptance check: `grep -r process.exit src/mcp/` returns nothing (Anti-Pattern 2's explicit check); each tool handler has a test exercising both its success path and its thrown-`Error` → `isError: true` path.
+4. **Phase D — End-to-end verification with a real MCP client.** Point Claude Code (or another MCP client) at `git turn mcp` via its CLI/`claude mcp add` mechanism, exercise all five tools against a real session with real turns, confirm an out-of-range turn number or an uninitialized repo surfaces as a recoverable tool error rather than killing the server, and confirm a second, unrelated tool call still succeeds afterward in the same session.
 
-PROJECT.md's stated requirement — "scan for likely secrets (API keys, high-entropy tokens) **before any prompt/response content** is written" — is a free-text content scan. Free-text prompts/responses have no key names to match against; warren's key-suffix approach is structurally inapplicable to this milestone's actual redaction target.
-
-**Recommendation for the roadmap:** Treat "reuse warren's secret pattern list" as satisfied only for the *convention* (redact-by-suffix on structured fields, `[REDACTED]` placeholder token), and budget real work in `src/redact.js` for a genuine content-pattern scanner (common secret-shape regexes + a generic high-entropy run detector) — this is new code, not an import, despite the phrasing in PROJECT.md. Flag this explicitly during roadmap creation so Phase 1 of the milestone isn't scoped as "wire up warren's redactor" (which would be a no-op integration) but as "build a content secret-scanner, reusing warren's `[REDACTED]` placeholder and key-suffix convention where structured fields (e.g. a stray `api_key` field inside `--usage` JSON) apply."
-
-## Suggested Build Order
-
-1. **`src/redact.js`** (new, no dependencies) — content secret-scanner + `[REDACTED]` placeholder, unit-testable in isolation before touching notes/cache at all.
-2. **`src/cache.js` schema migration** — add `usage TEXT` column (guarded `ALTER TABLE` for existing DBs), extend `upsertTurn()`'s column list to include `usage` from `meta?.usage`, add `updatePromptFields()`. Do this before the command exists so `record-prompt` has a stable target to call into, and so `gc --rebuild` on an old cache.db doesn't break the moment this ships.
-3. **`src/commands/record-prompt.js`** (new) — turn resolution (reusing `listTurns`/`parseSnapshotMessage`), redact, read-merge-write note, best-effort cache update. Depends on 1 and 2.
-4. **`bin/git-turn`** — add `'record-prompt'` to `COMMANDS` and help text. Trivial, last, so the command isn't reachable via CLI until it's actually finished.
-5. **`log.js`/`show.js` `--with-prompts` flag polish** — both already read `meta.prompt` defensively and gate display behind an existing `--with-prompts` check in `log.js`; verify `show.js` also respects it consistently (currently `show.js` prints `meta.prompt` unconditionally whenever present, with no flag gate — decide during roadmap whether that's intentional-by-design for `show <N>` — single-turn — versus `log`'s multi-turn listing where a flag makes more sense to avoid noisy output).
+Phases A and B have no data dependency on each other and could in principle be built in parallel by different people, but Phase C strictly requires both A (for `compute()` to call) and B (for `registerTool` to exist) to be done first.
 
 ## Sources
 
-- Direct source reading (HIGH confidence, no training-data assumptions): `src/hooks/post-commit.js`, `src/git.js`, `src/cache.js`, `src/session.js`, `src/blame-util.js`, `src/commands/log.js`, `src/commands/show.js`, `src/commands/cost.js`, `bin/git-turn`, `.planning/PROJECT.md` — all in `/Users/scowan/Projects/scottcowan/git-turn`.
-- `/Users/scowan/Projects/scottcowan/warren/packages/warren-common/src/warren_common/logging.py` and `secrets.py` — read directly to verify (and correct) the "reuse warren's secret pattern list" assumption in PROJECT.md.
+- Direct source inspection of this repo (2026-10-07): `bin/git-turn`, `src/commands/log.js`, `show.js`, `diff.js`, `blame.js`, `cost.js`, `src/git.js`, `src/cache.js`, `src/session.js`, `.planning/PROJECT.md`. HIGH confidence — all dispatch, error-handling, and cache-singleton claims verified by reading the actual code, not assumed.
+- `npx ctx7@latest docs /modelcontextprotocol/typescript-sdk` (Context7, fetched 2026-10-07) — `McpServer`/`registerTool`/`StdioServerTransport`/`serveStdio` API shape, including the `isError: true` recoverable-failure pattern. HIGH confidence (current official SDK docs, not training data).
+- `npm view @modelcontextprotocol/sdk version dependencies`, `npm view @modelcontextprotocol/server version dependencies`, `npm view @modelcontextprotocol/core version dependencies`, `npm view @modelcontextprotocol/server time.created time.modified` (live npm registry queries, 2026-10-07) — confirmed the lighter, actively-maintained (`2.3.1`, last published 2026-10-05) `@modelcontextprotocol/server`+`core` package pair as the correct choice over the heavier, older (`1.32.1`, created 2024-11-11) `@modelcontextprotocol/sdk`, which bundles unused HTTP-transport dependencies (`express`, `hono`, `cors`, `jose`). HIGH confidence (live registry data, not training-data assumption about package naming).
+- `npm pack @modelcontextprotocol/server` + inspecting the unpacked `package.json`'s `"exports"` map (2026-10-07) — confirmed dual CJS/ESM build (`require()` works from this CommonJS codebase with no build step). HIGH confidence (inspected the actual shipped package, not documentation claims about it).
+- `npm pack zod` + inspecting its `"exports"` map (2026-10-07) — confirmed `zod@4.6.5`'s root export is Zod v4, satisfying the SDK's `^4.2.0` peer requirement directly via `require('zod')`. HIGH confidence.
 
 ---
-*Architecture research for: git-turn v0.3 Prompt Capture integration*
-*Researched: 2026-09-17*
+*Architecture research for: MCP server addon integration, git-turn v0.4*
+*Researched: 2026-10-07*
