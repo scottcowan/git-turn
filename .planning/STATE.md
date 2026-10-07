@@ -70,6 +70,7 @@ Last activity: 2026-10-01 — Milestone v0.3 completed and archived
 - `2026-09-06-secret-redaction-on-notes.md` [security] — now scoped across Phase 4 (scanner) + Phase 6 (redact/purge), not a single locked requirement on one phase
 - `2026-09-07-rich-diff-renderer.md` [cli] — optional enhancement over shipped color-diff
 - `2026-09-17-mindwalk-integration.md` [integration] — explore turn-boundary markers for mindwalk's session replay via a preprocessing script, not a fork
+- `2026-10-07-explore-stable-change-identity-beyond-sha-anchoring.md` [research] — inspired by Delta/DeltaDB's stable change-identity model; explore content-hash/diff-anchor fallback for blame/show/redact robustness to history rewrites, no multiplayer/cloud/new-VCS scope
 
 ## Blockers/Concerns
 
