@@ -44,10 +44,15 @@ A git extension (`git turn <cmd>`) that automatically groups agent commits into 
 
 **Known issues:** none currently tracked. Milestone audit noted two pieces of tech debt (non-blocking, carried forward): `tool_summary` is captured and persisted but no reader command displays it yet (write-only field); `log --no-cache` computes its diff stat against the snapshot sha instead of the real HEAD sha (pre-existing `--no-cache` fallback inconsistency, found incidentally during E2E audit). See `.planning/todos/pending/` for other open work (rich diff renderer, an optional enhancement; mindwalk integration exploration — both acknowledged and deferred at v0.3 close).
 
-## Next Milestone Goals (v0.4 MCP Server)
+## Current Milestone: v0.4 MCP Server
 
-- Claude Code addon exposing `git_turn_log`, `git_turn_show`, `git_turn_revert` as MCP tools (Phase 7)
-- Candidate stretch: surface `tool_summary` in a reader command; fix the `log --no-cache` diff-stat sha bug (both carried as tech debt from v0.3)
+**Goal:** Claude Code (and other MCP clients) can drive git-turn's read-side via an MCP addon, without any destructive tool surface.
+
+**Target features:**
+- `git turn mcp` — new subcommand starting a stdio MCP server, scoped to the cwd's repo (same scoping as every other `git turn` command today)
+- `git_turn_log`, `git_turn_show`, `git_turn_diff`, `git_turn_blame`, `git_turn_cost` — read-only MCP tools mirroring the existing CLI commands' output
+- Explicitly deferred this milestone: `git_turn_revert` (destructive — no confirmation/dry-run pattern exists yet for MCP tool calls), `bisect`, `redact`, `record-prompt` (write/destructive ops)
+- Packaged inside the existing `git-turn` package/bin — no separate npm package to version and publish
 
 ## Prior art
 
@@ -73,4 +78,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-01 after v0.3 milestone completion*
+*Last updated: 2026-10-07 after v0.4 milestone started*

@@ -1,34 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.3
-milestone_name: Prompt Capture
-status: Awaiting next milestone
-stopped_at: Phase 6 context gathered
-last_updated: "2026-10-01T07:51:06.522Z"
-last_activity: 2026-10-01 — Milestone v0.3 completed and archived
+milestone: v0.4
+milestone_name: MCP Server
+status: planning
+last_updated: "2026-10-07T19:30:43.457Z"
+last_activity: 2026-10-07
 progress:
-  total_phases: 5
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 60
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-17)
+See: .planning/PROJECT.md (updated 2026-10-07)
 
 **Core value:** Know exactly which agent turn broke your code — diff, blame, bisect, and revert at turn granularity.
 **Current focus:** Planning next milestone (v0.4 MCP Server)
 
 ## Current Position
 
-Phase: Milestone v0.3 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-10-01 — Milestone v0.3 completed and archived
+Status: Defining requirements
+Last activity: 2026-10-07 — Milestone v0.4 started
 
 ## Performance Metrics
 
