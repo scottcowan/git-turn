@@ -49,7 +49,7 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 
 ### 📋 v0.4 MCP Server (Phases 7-10)
 
-- [ ] **Phase 7: Compute/Run Split & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost` and add a CLI-wide `--json` flag
+- [ ] **Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost`, make the full-line-highlight diff renderer the default (`--plain` restores today's output), and add a CLI-wide `--json` flag
 - [ ] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered
 - [ ] **Phase 9: Register Read-Only MCP Tools** - Wire up `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` as MCP tools
 - [ ] **Phase 10: End-to-End Verification with a Real MCP Client** - Claude Code exercises all 5 tools against a real session
@@ -60,16 +60,17 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 
 ## Phase Details
 
-### Phase 7: Compute/Run Split & CLI JSON Output
+### Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output
 
-**Goal**: `log`/`show`/`diff`/`blame`/`cost` each expose a pure, in-process-callable `compute()` function and a `--json` output mode, with zero change to today's default CLI behavior.
+**Goal**: `log`/`show`/`diff`/`blame`/`cost` each expose a pure, in-process-callable `compute()` function; `diff`/`show` get a richer default rendering with a `--plain` escape hatch; and a `--json` output mode is available on all 5.
 **Depends on**: Phase 6
-**Requirements**: REFACTOR-01, JSON-01
+**Requirements**: REFACTOR-01, DIFF-01, JSON-01
 **Success Criteria** (what must be TRUE):
 
   1. Each of `log`/`show`/`diff`/`blame`/`cost` exports a `compute(args)` that returns a string (or `Promise<string>` for `cost`) and throws `Error` on failure, instead of calling `process.exit`/`console.log` directly.
-  2. Running any of these 5 commands without `--json`, with any arguments, produces byte-identical stdout and exit codes to before the refactor (existing test suite passes with zero test-file edits).
-  3. Running any of these 5 commands with `--json` emits structured JSON instead of formatted text, usable by scripts/CI independent of MCP.
+  2. Running `diff`/`show` with `--plain`, with any arguments, produces byte-identical stdout and exit codes to today's `git diff --color=always`-passthrough behavior (existing test suite passes with zero test-file edits against the `--plain` path).
+  3. Running `diff`/`show` without `--plain` (the new default) renders full-row ANSI background highlighting per added/removed line, a line-number gutter, and an "Added N / removed M" summary header, respecting `NO_COLOR`/`FORCE_COLOR` the same way today's output does.
+  4. Running any of these 5 commands with `--json` emits structured JSON instead of formatted text, usable by scripts/CI independent of MCP.
 
 **Plans**: TBD
 
@@ -137,7 +138,7 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
 | 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
-| 7. Compute/run split & CLI JSON output | v0.4 | 0/? | Planned | — |
+| 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 0/? | Planned | — |
 | 8. MCP server scaffold | v0.4 | 0/? | Planned | — |
 | 9. Register read-only MCP tools | v0.4 | 0/? | Planned | — |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |

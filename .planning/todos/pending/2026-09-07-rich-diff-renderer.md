@@ -2,6 +2,7 @@
 created: 2026-09-07T00:00:00.000Z
 title: Richer full-line-highlight diff renderer for show/diff
 area: cli
+resolves_phase: 7
 files:
   - src/commands/diff.js
   - src/commands/show.js

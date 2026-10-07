@@ -67,6 +67,7 @@ Last activity: 2026-10-07 — v0.4 roadmap created (Phases 7-10), Warren integra
 - [v0.4 roadmap]: `--json` (JSON-01) folded into Phase 7 rather than given its own phase — it touches the same 5 command files as the compute/run split and has no dependency on the MCP scaffold.
 - [v0.4 roadmap]: VERIFY-03 (live round-trip note test) grouped into Phase 9 (tool registration) rather than Phase 10, since it specifically guards the per-tool sha-resolution logic being written in that phase; VERIFY-04 (real client E2E) is the dedicated Phase 10.
 - [v0.4 roadmap]: `git_turn_revert`/`bisect`/`redact`/`record-prompt` are not phases this milestone — explicitly deferred (no MCP confirmation/elicitation pattern exists yet); tracked in REQUIREMENTS.md Future Requirements, not a roadmap placeholder.
+- [Phase 7 discuss]: Folded the pending rich-diff-renderer todo (2026-09-07) into Phase 7 as new requirement DIFF-01, per explicit user direction, since it touches the same `diff.js`/`show.js` files already being refactored. Resolved the conflict with REFACTOR-01's "byte-identical" acceptance bar by making the rich renderer the new default and adding `--plain` to restore exact current output — REFACTOR-01's acceptance criterion is now verified against the `--plain` path, not the unflagged default. The stable-change-identity todo (score 0.2) was reviewed but not folded — unrelated to this phase's scope.
 
 ## Pending Todos
 

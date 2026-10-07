@@ -9,7 +9,11 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Prerequisite Refactor
 
-- [ ] **REFACTOR-01**: `log`/`show`/`diff`/`blame`/`cost` each export a `compute(args)` function that returns a string (or `Promise<string>` for `cost`) and throws `Error` on failure, with the existing `run(args)` reduced to a thin CLI wrapper around it — CLI-visible output and exit codes are byte-identical before and after the refactor
+- [ ] **REFACTOR-01**: `log`/`show`/`diff`/`blame`/`cost` each export a `compute(args)` function that returns a string (or `Promise<string>` for `cost`) and throws `Error` on failure, with the existing `run(args)` reduced to a thin CLI wrapper around it — CLI-visible output and exit codes are byte-identical before and after the refactor **when run with `--plain`** (see DIFF-01, which changes the unflagged default)
+
+### Rich Diff Rendering
+
+- [ ] **DIFF-01**: `diff`/`show` render a richer full-line-highlight format by default (full-row ANSI background per added/removed line, a line-number gutter, and an "Added N / removed M" summary header), replacing today's foreground-only `git diff --color=always` passthrough as the default; a `--plain` flag restores the exact current plain-text/foreground-color format byte-for-byte (this is what REFACTOR-01's byte-identical acceptance criterion is verified against)
 
 ### MCP Server Infrastructure
 
@@ -66,6 +70,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | REFACTOR-01 | Phase 7 | Pending |
+| DIFF-01 | Phase 7 | Pending |
 | MCP-01 | Phase 8 | Pending |
 | MCP-02 | Phase 8 | Pending |
 | MCP-03 | Phase 8 | Pending |
@@ -81,10 +86,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VERIFY-04 | Phase 10 | Pending |
 
 **Coverage:**
-- v1 requirements: 14 total
-- Mapped to phases: 14
+- v1 requirements: 15 total
+- Mapped to phases: 15
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-07 after initial definition*
+*Last updated: 2026-10-07 after folding DIFF-01 (rich diff renderer) into Phase 7 during discuss-phase*
