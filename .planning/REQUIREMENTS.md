@@ -65,25 +65,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REFACTOR-01 | TBD | Pending |
-| MCP-01 | TBD | Pending |
-| MCP-02 | TBD | Pending |
-| MCP-03 | TBD | Pending |
-| MCP-04 | TBD | Pending |
-| MCP-05 | TBD | Pending |
-| MCP-06 | TBD | Pending |
-| MCP-07 | TBD | Pending |
-| MCP-08 | TBD | Pending |
-| MCP-09 | TBD | Pending |
-| MCP-10 | TBD | Pending |
-| JSON-01 | TBD | Pending |
-| VERIFY-03 | TBD | Pending |
-| VERIFY-04 | TBD | Pending |
+| REFACTOR-01 | Phase 7 | Pending |
+| MCP-01 | Phase 8 | Pending |
+| MCP-02 | Phase 8 | Pending |
+| MCP-03 | Phase 8 | Pending |
+| MCP-04 | Phase 9 | Pending |
+| MCP-05 | Phase 9 | Pending |
+| MCP-06 | Phase 9 | Pending |
+| MCP-07 | Phase 9 | Pending |
+| MCP-08 | Phase 9 | Pending |
+| MCP-09 | Phase 9 | Pending |
+| MCP-10 | Phase 9 | Pending |
+| JSON-01 | Phase 7 | Pending |
+| VERIFY-03 | Phase 9 | Pending |
+| VERIFY-04 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 ⚠️ (filled during roadmap creation)
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-07*

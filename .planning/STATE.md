@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-10-07T19:30:43.457Z"
 last_activity: 2026-10-07
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,20 +20,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-07)
 
 **Core value:** Know exactly which agent turn broke your code — diff, blame, bisect, and revert at turn granularity.
-**Current focus:** Planning next milestone (v0.4 MCP Server)
+**Current focus:** Roadmap approved for v0.4 MCP Server (Phases 7-10); ready for `/gsd-plan-phase 7`
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 7 (Compute/Run Split & CLI JSON Output) — not yet planned
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-07 — Milestone v0.4 started
+Status: Roadmap created
+Last activity: 2026-10-07 — v0.4 roadmap created (Phases 7-10), Warren integration renumbered to Phase 11
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8 (this milestone)
+- Total plans completed: 8 (prior milestones; 0 this milestone)
 - Average duration: n/a
 - Total execution time: n/a
 
@@ -63,6 +63,10 @@ Last activity: 2026-10-07 — Milestone v0.4 started
 - [v0.3 roadmap]: Cache schema migration (`usage` column) folded into Phase 5 as an implementation prerequisite rather than a standalone roadmap phase — no independent user-observable behavior of its own
 - [v0.3 roadmap]: `redact <N>` and the purge procedure (REDACT-02/03) grouped with verification (Phase 6) rather than with the scanner (Phase 4), since both are post-hoc remediation for the write path Phase 5 delivers
 - [v0.3 roadmap]: MCP server moved out of v0.3 (per PROJECT.md, deferred) — renumbered as v0.4 Phase 7; Warren integration shifted to Phase 8
+- [v0.4 roadmap]: MCP server milestone expanded from the single placeholder Phase 7 into 4 phases (7-10), following research's build-order sequencing: compute/run split -> server scaffold -> register tools -> E2E verification with a real client. Warren integration renumbered Phase 8 -> Phase 11.
+- [v0.4 roadmap]: `--json` (JSON-01) folded into Phase 7 rather than given its own phase — it touches the same 5 command files as the compute/run split and has no dependency on the MCP scaffold.
+- [v0.4 roadmap]: VERIFY-03 (live round-trip note test) grouped into Phase 9 (tool registration) rather than Phase 10, since it specifically guards the per-tool sha-resolution logic being written in that phase; VERIFY-04 (real client E2E) is the dedicated Phase 10.
+- [v0.4 roadmap]: `git_turn_revert`/`bisect`/`redact`/`record-prompt` are not phases this milestone — explicitly deferred (no MCP confirmation/elicitation pattern exists yet); tracked in REQUIREMENTS.md Future Requirements, not a roadmap placeholder.
 
 ## Pending Todos
 
@@ -75,22 +79,25 @@ Last activity: 2026-10-07 — Milestone v0.4 started
 
 - Cross-process race window between the post-commit hook and `record-prompt` (Phase 5) has no existing lock primitive — flagged in research for deeper investigation during `/gsd-plan-phase 5`.
 - Secret-scanner false-negative behavior against freeform conversational text is reasoned, not empirically validated — Phase 4 planning should budget for building a realistic fixture set, not just vendor-pattern unit tests.
+- `server.connect(transport)`'s promise-resolution timing (does it resolve only on stdio close, or right after handshake) is MEDIUM confidence per research and must be verified empirically during Phase 8 planning/execution before Phase 9's tools depend on it.
 
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | uat | 03-UAT.md (Phase 03) | resolved, 0 pending scenarios | v0.2 close |
-| feature | MCP server | planned, moved to v0.4 (Phase 7) | v0.3 roadmap creation, 2026-09-17 |
+| feature | MCP server | in progress, v0.4 Phases 7-10 | v0.3 roadmap creation, 2026-09-17 |
+| feature | Warren integration | planned, moved to v1.0 (Phase 11) | v0.4 roadmap creation, 2026-10-07 |
+| feature | `git_turn_revert`/`bisect`/`redact`/`record-prompt` as MCP tools | deferred, blocked on MCP confirmation/elicitation pattern | v0.4 requirements definition, 2026-10-07 |
 | todo | 2026-09-07-rich-diff-renderer.md [cli] | acknowledged, deferred | v0.3 close, 2026-10-01 |
 | todo | 2026-09-17-mindwalk-integration.md [integration] | acknowledged, deferred | v0.3 close, 2026-10-01 |
 
 ## Session Continuity
 
-Last session: 2026-09-20T23:36:16.810Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-verification-redact-command-purge-procedure/06-CONTEXT.md
+Last session: 2026-10-07T19:30:43.457Z
+Stopped at: v0.4 roadmap created (Phases 7-10), awaiting approval
+Resume file: .planning/ROADMAP.md
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review and approve the v0.4 roadmap, then run `/gsd-plan-phase 7`
