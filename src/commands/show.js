@@ -1,21 +1,30 @@
 'use strict';
 
-const { git, gitSafe, shouldColor } = require('../git');
+const { gitSafe, shouldColor } = require('../git');
 const { readSession, listTurns, NOTES_REF } = require('../session');
 const { parseSnapshotMessage } = require('../blame-util');
+const { renderRich, parseDiff, EMPTY_TREE } = require('../diff-render');
 
-function run(args) {
+function compute(args, opts = {}) {
   const session = readSession();
-  if (!session) { console.error('git turn: not initialized'); process.exit(1); }
+  if (!session) {
+    throw new Error('git turn: not initialized');
+  }
 
-  const turnN = parseInt(args[0], 10);
-  if (isNaN(turnN)) { console.error('Usage: git turn show <N>'); process.exit(1); }
+  const positional = args.filter(a => a !== '--json' && a !== '--plain');
+
+  const turnN = parseInt(positional[0], 10);
+  if (isNaN(turnN)) {
+    throw new Error('Usage: git turn show <N>');
+  }
 
   const turns = listTurns(session.session_id);
   const turn = turns.find(t => t.turn_n === turnN);
   const prev = turns.find(t => t.turn_n === turnN - 1);
 
-  if (!turn) { console.error(`git turn: turn ${turnN} not found`); process.exit(1); }
+  if (!turn) {
+    throw new Error(`git turn: turn ${turnN} not found`);
+  }
 
   const withPrompts = args.includes('--with-prompts');
 
@@ -29,26 +38,67 @@ function run(args) {
   let meta = {};
   try { meta = note ? JSON.parse(note) : {}; } catch {}
 
-  // Header
-  console.log(`Turn ${turnN}  ${head.slice(0, 7)}  ${new Date(meta.ts || 0).toLocaleString()}`);
-  if (meta.model) console.log(`Model: ${meta.model}`);
-  if (meta.latency_ms) console.log(`Latency: ${meta.latency_ms}ms`);
-  if (withPrompts && meta.prompt) {
-    console.log(`\nPrompt:\n  ${meta.prompt.replace(/\n/g, '\n  ')}`);
-  }
-  console.log('');
+  const shaA = prev ? prev.sha : EMPTY_TREE;
+  const shaB = turn.sha;
 
-  // Diff: worktree-tree of this turn vs previous turn
-  const colorArg = shouldColor() ? '--color=always' : '--color=never';
-  if (prev) {
-    const diffOut = gitSafe(['diff', colorArg, prev.sha, turn.sha]) || '(no changes)';
-    console.log(diffOut);
+  const json = args.includes('--json');
+  const plain = args.includes('--plain');
+
+  if (json) {
+    const raw = gitSafe(['diff', '--color=never', shaA, shaB]) || '';
+    const { added, removed } = parseDiff(raw);
+    return JSON.stringify({
+      turn: turnN,
+      sha: head,
+      snapshot_sha: turn.sha,
+      ts: meta.ts ?? null,
+      model: meta.model ?? null,
+      latency_ms: meta.latency_ms ?? null,
+      usage: meta.usage ?? null,
+      tool_summary: meta.tool_summary ?? null,
+      ...(withPrompts && meta.prompt ? { prompt: meta.prompt } : {}),
+      from_sha: shaA,
+      to_sha: shaB,
+      diff: raw,
+      added,
+      removed,
+    });
+  }
+
+  const lines = [];
+
+  // Header
+  lines.push(`Turn ${turnN}  ${head.slice(0, 7)}  ${new Date(meta.ts || 0).toLocaleString()}`);
+  if (meta.model) lines.push(`Model: ${meta.model}`);
+  if (meta.latency_ms) lines.push(`Latency: ${meta.latency_ms}ms`);
+  if (withPrompts && meta.prompt) {
+    lines.push(`\nPrompt:\n  ${meta.prompt.replace(/\n/g, '\n  ')}`);
+  }
+  lines.push('');
+
+  if (plain) {
+    const colorArg = shouldColor() ? '--color=always' : '--color=never';
+    lines.push(gitSafe(['diff', colorArg, shaA, shaB]) || '(no changes)');
   } else {
-    // First turn — diff against empty tree
-    const emptyTree = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-    const diffOut = gitSafe(['diff', colorArg, emptyTree, turn.sha]) || '(no changes)';
-    console.log(diffOut);
+    const raw = gitSafe(['diff', '--color=never', shaA, shaB]) || '';
+    lines.push(renderRich(raw, { color: shouldColor(), width: process.stdout.columns || 120 }));
+  }
+
+  return lines.join('\n');
+}
+
+function run(args) {
+  try {
+    console.log(compute(args, { stderr: (s) => process.stderr.write(s) }));
+  } catch (e) {
+    if (args.includes('--json')) {
+      console.log(JSON.stringify({ error: e.message }));
+      process.exit(1);
+      return;
+    }
+    console.error(e.message);
+    process.exit(1);
   }
 }
 
-module.exports = { run };
+module.exports = { run, compute };
