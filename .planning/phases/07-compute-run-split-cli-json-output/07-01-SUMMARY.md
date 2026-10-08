@@ -92,3 +92,11 @@ None - no external service configuration required.
 ---
 *Phase: 07-compute-run-split-cli-json-output*
 *Completed: 2026-10-08*
+
+## Self-Check: PASSED
+
+- FOUND: src/diff-render.js
+- FOUND: src/diff-render.test.js
+- FOUND: .planning/phases/07-compute-run-split-cli-json-output/07-01-SUMMARY.md
+- FOUND: 7274f46 (test commit)
+- FOUND: 1952a35 (feat commit)
