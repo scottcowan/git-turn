@@ -83,7 +83,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 07-04-PLAN.md — diff + show: compute()/run() split, rich default, `--plain`, `--json` [wave 2]
+- [x] 07-04-PLAN.md — diff + show: compute()/run() split, rich default, `--plain`, `--json` [wave 2]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -153,7 +153,7 @@ Plans:
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
 | 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
-| 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 3/5 | In Progress|  |
+| 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 4/5 | In Progress|  |
 | 8. MCP server scaffold | v0.4 | 0/? | Planned | — |
 | 9. Register read-only MCP tools | v0.4 | 0/? | Planned | — |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
