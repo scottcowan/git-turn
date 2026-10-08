@@ -1,9 +1,9 @@
 ---
 phase: 7
 slug: compute-run-split-cli-json-output
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-10-08
 ---
 
@@ -51,11 +51,11 @@ created: 2026-10-08
 
 ## Wave 0 Requirements
 
-- [ ] `src/diff-render.test.js` — new file, covers `parseDiff()`'s `{added, removed}` counting and `renderRich()`'s structural output (gutter numbers, line-type classification, summary header), both with `color: true` and `color: false`
-- [ ] New test cases in each of `log.test.js`/`show.test.js`/`diff.test.js`/`blame.test.js`/`cost.test.js` directly importing and calling `compute(args)` (not just `run(args)`), asserting it returns a string (or `Promise<string>` for cost) and throws on the existing error conditions each file already tests via `run()`'s `process.exit` stub
-- [ ] New `--json` test cases per command file, asserting `JSON.parse(output)` succeeds and matches the proposed shape's key fields
-- [ ] New `--plain` byte-identity test cases in `diff.test.js`/`show.test.js` — capture `run(['N', '--plain'])`'s output and assert it's unchanged from a pinned pre-refactor fixture (or assert it matches a direct `gitSafe(['diff', colorArg, shaA, shaB])` call made inline in the test)
-- [ ] Framework install: none — `node --test` already wired via `npm test`
+- [x] `src/diff-render.test.js` — assigned to plan 07-01 (TDD RED/GREEN), covers `parseDiff()`'s `{added, removed}` counting and `renderRich()`'s structural output (gutter numbers, line-type classification, summary header), both with `color: true` and `color: false`
+- [x] New test cases in each of `log.test.js`/`show.test.js`/`diff.test.js`/`blame.test.js`/`cost.test.js` directly importing and calling `compute(args)` — assigned to plans 07-02 (log/blame), 07-03 (cost), 07-04 (diff/show)
+- [x] New `--json` test cases per command file — assigned to plans 07-02, 07-03, 07-04
+- [x] New `--plain` byte-identity test cases in `diff.test.js`/`show.test.js` — assigned to plan 07-04, verified via `git diff 98679b8 -- <test file>` additions-only check
+- [x] Framework install: none — `node --test` already wired via `npm test`
 
 ---
 
@@ -69,11 +69,11 @@ created: 2026-10-08
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies — confirmed by plan checker (Nyquist Compliance: PASS)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify — confirmed by plan checker
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-10-08 (plan checker VERIFICATION PASSED, 0 blockers)

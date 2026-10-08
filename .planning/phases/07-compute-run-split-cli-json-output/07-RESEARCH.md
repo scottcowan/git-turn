@@ -544,14 +544,14 @@ Exit code 1, same as today's non-JSON stderr path. The message text is identical
 
 **If this table is empty:** N/A — see entries above. None of these risk incorrect behavior, only cosmetic/shape choices explicitly deferred to this research by CONTEXT.md's own "Claude's Discretion" section.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exact `cost --json --all` shape**
+1. **Exact `cost --json --all` shape** — RESOLVED: flat shape, `session_id` field per turn (plan 07-03). Matches this section's own recommendation.
    - What we know: `cost --all` today just removes the "current session only" filter from `listTurns()`'s underlying query and otherwise renders identically.
    - What's unclear: whether `--json --all`'s turns array should carry a `session_id` field per turn (flat), or nest under a `sessions: [{session_id, turns: [...]}]` array (grouped).
    - Recommendation: flat with a `session_id` field per turn — simpler, and avoids forcing every consumer to flatten a nested structure just to compute a global total. Planner should confirm this during plan review since it's a genuine design choice, not a research-settled fact.
 
-2. **Should `renderRich()`'s hunk/file headers (`diff --git ...`, `@@ ... @@`) get their own distinct styling (dim) beyond "default foreground, no background"?**
+2. **Should `renderRich()`'s hunk/file headers (`diff --git ...`, `@@ ... @@`) get their own distinct styling (dim) beyond "default foreground, no background"?** — RESOLVED: dim (`\x1b[2m`) on headers (plan 07-01's `renderRich()` color spec). Matches this section's own recommendation.
    - What we know: CONTEXT.md's reference look (Claude Code's side panel) distinguishes added/removed/context rows via full-row background; it says nothing explicit about hunk-header styling.
    - What's unclear: whether leaving hunk headers fully unstyled looks visually disconnected from the rest of the rich rendering.
    - Recommendation: dim (`\x1b[2m`) is a safe, low-risk default (shown in Pattern 3's code) — cheap to change later since it's an isolated one-line choice, not structural.
