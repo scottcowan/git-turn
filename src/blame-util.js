@@ -202,7 +202,7 @@ function annotateFromSnapshots(file, turns) {
 
   if (turns.length === 0) return [];
   const lastTurn = turns[turns.length - 1];
-  const finalContent = gitSafe(['show', lastTurn.snapshot_sha + ':' + file]) || '';
+  const finalContent = gitSafe(['show', lastTurn.snapshot_sha + ':' + file], { stdio: ['pipe', 'pipe', 'ignore'] }) || '';
   const lines = finalContent.split('\n');
   if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
 

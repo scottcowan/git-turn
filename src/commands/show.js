@@ -34,7 +34,7 @@ function compute(args, opts = {}) {
   const head = headSha || turn.sha;
 
   // Get metadata from note
-  const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', head]);
+  const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', head], { stdio: ['pipe', 'pipe', 'ignore'] });
   let meta = {};
   try { meta = note ? JSON.parse(note) : {}; } catch {}
 
