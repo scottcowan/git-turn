@@ -76,42 +76,51 @@ function computeCost(price, usage) {
   return input + output + cacheRead + cacheWrite;
 }
 
-async function run(args) {
+async function compute(args, opts = {}) {
   const session = readSession();
   if (!session) {
-    console.error('git turn: not initialized. Run `git turn init` first.');
-    process.exit(1);
+    throw new Error('git turn: not initialized. Run `git turn init` first.');
   }
 
   // Parse --all flag to show all sessions, not just current
   const allSessions = args.includes('--all');
+  const wantJson = args.includes('--json');
 
   let pricing;
+  if (opts.stderr) opts.stderr('Fetching pricing data...\r');
   try {
-    process.stderr.write('Fetching pricing data...\r');
     pricing = await loadPricing();
-    process.stderr.write('                        \r');
   } catch (e) {
-    console.error(`git turn: could not load pricing data: ${e.message}`);
-    console.error('Check your internet connection or try again later.');
-    process.exit(1);
+    throw new Error(`git turn: could not load pricing data: ${e.message}\nCheck your internet connection or try again later.`);
   }
+  if (opts.stderr) opts.stderr('                        \r');
 
   // Collect turns with notes
   const turns = listTurns(session.session_id);
   if (turns.length === 0) {
-    console.log('No turns yet this session.');
-    return;
+    if (wantJson) {
+      return JSON.stringify({
+        session_id: session.session_id,
+        turns: [],
+        total_cost: 0,
+        turns_with_cost: 0,
+        turns_with_model: 0,
+        model_totals: {},
+      });
+    }
+    return 'No turns yet this session.';
   }
 
+  const lines = [];
+  const jsonTurns = [];
   let totalCost = 0;
   let turnsWithCost = 0;
   let turnsWithModel = 0;
   const modelTotals = {};
 
-  console.log(`Session: ${session.session_id}\n`);
-  console.log(`  ${'Turn'.padEnd(5)}  ${'Model'.padEnd(30)}  ${'Input'.padStart(8)}  ${'Output'.padStart(8)}  ${'Cost'.padStart(10)}`);
-  console.log(`  ${'-'.repeat(5)}  ${'-'.repeat(30)}  ${'-'.repeat(8)}  ${'-'.repeat(8)}  ${'-'.repeat(10)}`);
+  lines.push(`Session: ${session.session_id}\n`);
+  lines.push(`  ${'Turn'.padEnd(5)}  ${'Model'.padEnd(30)}  ${'Input'.padStart(8)}  ${'Output'.padStart(8)}  ${'Cost'.padStart(10)}`);
+  lines.push(`  ${'-'.repeat(5)}  ${'-'.repeat(30)}  ${'-'.repeat(8)}  ${'-'.repeat(8)}  ${'-'.repeat(10)}`);
 
   for (const { turn_n, sha } of turns) {
     const { headSha } = parseSnapshotMessage(sha);
@@ -133,32 +142,73 @@ async function run(args) {
     const outputDisplay = usage ? String(usage.output_tokens || 0).padStart(8) : '       ?';
     const costDisplay = cost !== null ? `$${cost.toFixed(4)}`.padStart(10) : '         ?';
 
-    console.log(`  ${String(turn_n).padStart(5)}  ${modelDisplay.slice(0, 30).padEnd(30)}  ${inputDisplay}  ${outputDisplay}  ${costDisplay}`);
+    lines.push(`  ${String(turn_n).padStart(5)}  ${modelDisplay.slice(0, 30).padEnd(30)}  ${inputDisplay}  ${outputDisplay}  ${costDisplay}`);
 
     if (cost !== null) {
       totalCost += cost;
       turnsWithCost++;
       modelTotals[modelDisplay] = (modelTotals[modelDisplay] || 0) + cost;
     }
+
+    if (wantJson) {
+      const numOrNull = (v) => (typeof v === 'number' ? v : null);
+      jsonTurns.push({
+        turn: turn_n,
+        session_id: session.session_id,
+        model: model,
+        input_tokens: usage ? numOrNull(usage.input_tokens) : null,
+        output_tokens: usage ? numOrNull(usage.output_tokens) : null,
+        cache_read_input_tokens: usage ? numOrNull(usage.cache_read_input_tokens) : null,
+        cache_creation_input_tokens: usage ? numOrNull(usage.cache_creation_input_tokens) : null,
+        cost: cost,
+      });
+    }
   }
 
-  console.log(`\n  ${'-'.repeat(68)}`);
+  if (wantJson) {
+    return JSON.stringify({
+      session_id: session.session_id,
+      turns: jsonTurns,
+      total_cost: totalCost,
+      turns_with_cost: turnsWithCost,
+      turns_with_model: turnsWithModel,
+      model_totals: modelTotals,
+    });
+  }
+
+  lines.push(`\n  ${'-'.repeat(68)}`);
 
   if (turnsWithCost > 0) {
-    console.log(`  Total cost (${turnsWithCost}/${turns.length} turns): $${totalCost.toFixed(4)}`);
+    lines.push(`  Total cost (${turnsWithCost}/${turns.length} turns): $${totalCost.toFixed(4)}`);
     if (Object.keys(modelTotals).length > 1) {
       for (const [model, cost] of Object.entries(modelTotals)) {
-        console.log(`    ${model}: $${cost.toFixed(4)}`);
+        lines.push(`    ${model}: $${cost.toFixed(4)}`);
       }
     }
   } else if (turnsWithModel === 0) {
-    console.log(`\n  No cost data available.`);
-    console.log(`  Model and token usage are recorded by the Claude Code Stop hook.`);
-    console.log(`  Make sure git-turn-note.js is configured and includes model/usage fields.`);
+    lines.push(`\n  No cost data available.`);
+    lines.push(`  Model and token usage are recorded by the Claude Code Stop hook.`);
+    lines.push(`  Make sure git-turn-note.js is configured and includes model/usage fields.`);
   } else {
-    console.log(`\n  Models recorded but no token usage data.`);
-    console.log(`  Cost tracking requires token counts — these are not yet available from the Claude Code Stop hook.`);
+    lines.push(`\n  Models recorded but no token usage data.`);
+    lines.push(`  Cost tracking requires token counts — these are not yet available from the Claude Code Stop hook.`);
+  }
+
+  return lines.join('\n');
+}
+
+async function run(args) {
+  try {
+    console.log(await compute(args, { stderr: (s) => process.stderr.write(s) }));
+  } catch (e) {
+    if (args.includes('--json')) {
+      console.log(JSON.stringify({ error: e.message }));
+      process.exit(1);
+      return;
+    }
+    console.error(e.message);
+    process.exit(1);
   }
 }
 
-module.exports = { run };
+module.exports = { run, compute, lookupPrice, computeCost };

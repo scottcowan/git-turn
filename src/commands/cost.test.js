@@ -192,4 +192,214 @@ describe('cost command', () => {
     const combined = out.join('\n');
     assert.match(combined, /No turns yet this session\./);
   });
+
+  // Task 1: async compute()/run() split — compute() must be write-free
+  // without opts, resolve/reject with the documented strings, and route
+  // all progress/error text through opts.stderr / thrown Error only.
+
+  test('compute() resolves to a string reporting $0.0105 for 1/1 turns', async () => {
+    seedHookNote();
+    seedFakePricing(dir, 'claude-sonnet-4-5', {
+      input_cost_per_token: 0.000003,
+      output_cost_per_token: 0.000015,
+    });
+    runWithStdin({ model: 'claude-sonnet-4-5', usage: { input_tokens: 1000, output_tokens: 500 } });
+
+    delete require.cache[require.resolve('./cost')];
+    const result = await require('./cost').compute([]);
+    assert.match(result, /Total cost \(1\/1 turns\): \$0\.0105/);
+  });
+
+  test('compute() with no session rejects with the not-initialized Error message', async () => {
+    const { gitDir } = require('../git');
+    const { rmSync: rm } = require('fs');
+    rm(join(gitDir(), 'git-turn', 'session.json'), { force: true });
+
+    delete require.cache[require.resolve('./cost')];
+    await assert.rejects(
+      require('./cost').compute([]),
+      { message: 'git turn: not initialized. Run `git turn init` first.' }
+    );
+  });
+
+  test('compute(args, { stderr }) calls the sink with the fetching line then the clearing line, in order', async () => {
+    seedFakePricing(dir, 'claude-sonnet-4-5', {
+      input_cost_per_token: 0.000003,
+      output_cost_per_token: 0.000015,
+    });
+
+    const calls = [];
+    delete require.cache[require.resolve('./cost')];
+    await require('./cost').compute([], { stderr: (s) => calls.push(s) });
+
+    assert.deepEqual(calls, ['Fetching pricing data...\r', '                        \r']);
+  });
+
+  test('compute() with no opts never calls console/process stubs', async () => {
+    seedHookNote();
+    seedFakePricing(dir, 'claude-sonnet-4-5', {
+      input_cost_per_token: 0.000003,
+      output_cost_per_token: 0.000015,
+    });
+    runWithStdin({ model: 'claude-sonnet-4-5', usage: { input_tokens: 1000, output_tokens: 500 } });
+
+    const origLog = console.log;
+    const origErr = console.error;
+    const origExit = process.exit;
+    const origStderrWrite = process.stderr.write;
+
+    console.log = () => { throw new Error('console.log called'); };
+    console.error = () => { throw new Error('console.error called'); };
+    process.exit = () => { throw new Error('process.exit called'); };
+    process.stderr.write = () => { throw new Error('process.stderr.write called'); };
+
+    try {
+      delete require.cache[require.resolve('./cost')];
+      const result = await require('./cost').compute([]);
+      assert.match(result, /Total cost/);
+    } finally {
+      console.log = origLog;
+      console.error = origErr;
+      process.exit = origExit;
+      process.stderr.write = origStderrWrite;
+    }
+  });
+
+  test('compute() rejects with the pricing-load-failure message when loadPricing fails, and run() prints both lines and exits 1', async () => {
+    writeFileSync(join(dir, '.git-turn-pricing.json'), JSON.stringify({ _fetched_at: 0, data: {} }));
+
+    const https = require('https');
+    const origGet = https.get;
+    https.get = (url, cb) => {
+      const { EventEmitter } = require('events');
+      const req = new EventEmitter();
+      req.setTimeout = () => {};
+      req.destroy = () => {};
+      process.nextTick(() => req.emit('error', new Error('network unreachable')));
+      return req;
+    };
+
+    try {
+      delete require.cache[require.resolve('./cost')];
+      await assert.rejects(
+        require('./cost').compute([]),
+        { message: 'git turn: could not load pricing data: network unreachable\nCheck your internet connection or try again later.' }
+      );
+
+      delete require.cache[require.resolve('./cost')];
+      const { err, exitCode } = await captureCostAsync([]);
+      assert.equal(exitCode, 1);
+      assert.match(err, /git turn: could not load pricing data: network unreachable/);
+      assert.match(err, /Check your internet connection or try again later\./);
+    } finally {
+      https.get = origGet;
+    }
+  });
+
+  test('compute() on a no-turns session resolves to a string ending "No turns yet this session."', async () => {
+    seedFakePricing(dir, 'claude-sonnet-4-5', {
+      input_cost_per_token: 0.000003,
+      output_cost_per_token: 0.000015,
+    });
+
+    delete require.cache[require.resolve('./cost')];
+    const result = await require('./cost').compute([]);
+    assert.ok(result.endsWith('No turns yet this session.'));
+  });
+
+  // Task 2: --json output
+
+  test('compute(["--json"]) with one priced turn parses to the documented object shape', async () => {
+    seedHookNote();
+    seedFakePricing(dir, 'claude-sonnet-4-5', {
+      input_cost_per_token: 0.000003,
+      output_cost_per_token: 0.000015,
+    });
+    runWithStdin({ model: 'claude-sonnet-4-5', usage: { input_tokens: 1000, output_tokens: 500 } });
+
+    delete require.cache[require.resolve('./cost')];
+    const result = JSON.parse(await require('./cost').compute(['--json']));
+
+    assert.deepEqual(
+      Object.keys(result).sort(),
+      ['model_totals', 'session_id', 'total_cost', 'turns', 'turns_with_cost', 'turns_with_model'].sort()
+    );
+    assert.equal(result.session_id, session.session_id);
+    assert.equal(result.turns.length, 1);
+
+    const turn = result.turns[0];
+    assert.deepEqual(
+      Object.keys(turn).sort(),
+      ['turn', 'session_id', 'model', 'input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens', 'cost'].sort()
+    );
+    assert.equal(turn.turn, 1);
+    assert.equal(turn.session_id, session.session_id);
+    assert.equal(turn.model, 'claude-sonnet-4-5');
+    assert.equal(turn.input_tokens, 1000);
+    assert.equal(turn.output_tokens, 500);
+    assert.equal(turn.cache_read_input_tokens, null);
+    assert.equal(turn.cache_creation_input_tokens, null);
+    assert.ok(Math.abs(turn.cost - 0.0105) < 1e-9);
+
+    assert.ok(Math.abs(result.total_cost - 0.0105) < 1e-9);
+    assert.equal(result.turns_with_cost, 1);
+    assert.equal(result.turns_with_model, 1);
+    assert.ok(Math.abs(result.model_totals['claude-sonnet-4-5'] - 0.0105) < 1e-9);
+  });
+
+  test('compute(["--json"]) excludes a turn with no model/usage from total_cost and reports null fields', async () => {
+    const { makeTurn } = require('../helpers/turn-fixtures');
+    makeTurn(session, 'a', repo.git);
+    seedFakePricing(dir, 'claude-sonnet-4-5', {
+      input_cost_per_token: 0.000003,
+      output_cost_per_token: 0.000015,
+    });
+
+    delete require.cache[require.resolve('./cost')];
+    const result = JSON.parse(await require('./cost').compute(['--json']));
+
+    assert.equal(result.turns.length, 1);
+    const turn = result.turns[0];
+    assert.equal(turn.model, null);
+    assert.equal(turn.input_tokens, null);
+    assert.equal(turn.output_tokens, null);
+    assert.equal(turn.cache_read_input_tokens, null);
+    assert.equal(turn.cache_creation_input_tokens, null);
+    assert.equal(turn.cost, null);
+    assert.equal(result.total_cost, 0);
+    assert.equal(result.turns_with_cost, 0);
+  });
+
+  test('compute(["--json"]) on a no-turns session parses to the empty-session shape', async () => {
+    seedFakePricing(dir, 'claude-sonnet-4-5', {
+      input_cost_per_token: 0.000003,
+      output_cost_per_token: 0.000015,
+    });
+
+    delete require.cache[require.resolve('./cost')];
+    const result = JSON.parse(await require('./cost').compute(['--json']));
+
+    assert.deepEqual(result, {
+      session_id: session.session_id,
+      turns: [],
+      total_cost: 0,
+      turns_with_cost: 0,
+      turns_with_model: 0,
+      model_totals: {},
+    });
+  });
+
+  test('run(["--json"]) with no session prints the error object on stdout and exits 1', async () => {
+    const { gitDir } = require('../git');
+    const { rmSync: rm } = require('fs');
+    rm(join(gitDir(), 'git-turn', 'session.json'), { force: true });
+
+    delete require.cache[require.resolve('./cost')];
+    const { out, exitCode } = await captureCostAsync(['--json']);
+
+    assert.equal(exitCode, 1);
+    assert.deepEqual(JSON.parse(out.join('\n')), {
+      error: 'git turn: not initialized. Run `git turn init` first.',
+    });
+  });
 });
