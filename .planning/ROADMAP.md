@@ -72,7 +72,14 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
   3. Running `diff`/`show` without `--plain` (the new default) renders full-row ANSI background highlighting per added/removed line, a line-number gutter, and an "Added N / removed M" summary header, respecting `NO_COLOR`/`FORCE_COLOR` the same way today's output does.
   4. Running any of these 5 commands with `--json` emits structured JSON instead of formatted text, usable by scripts/CI independent of MCP.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — TDD: pure rich unified-diff renderer `src/diff-render.js` (parseDiff/renderRich/EMPTY_TREE) [wave 1]
+- [ ] 07-02-PLAN.md — log + blame: compute()/run() split and `--json` [wave 1]
+- [ ] 07-03-PLAN.md — cost: async compute()/run() split and `--json` [wave 1]
+- [ ] 07-04-PLAN.md — diff + show: compute()/run() split, rich default, `--plain`, `--json` [wave 2]
+- [ ] 07-05-PLAN.md — compute() purity gate + CLI e2e test, docs (help/AGENTS/README), visual checkpoint [wave 3]
 
 ### Phase 8: MCP Server Scaffold
 
