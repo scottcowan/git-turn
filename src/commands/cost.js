@@ -84,6 +84,7 @@ async function compute(args, opts = {}) {
 
   // Parse --all flag to show all sessions, not just current
   const allSessions = args.includes('--all');
+  const wantJson = args.includes('--json');
 
   let pricing;
   if (opts.stderr) opts.stderr('Fetching pricing data...\r');
@@ -97,10 +98,21 @@ async function compute(args, opts = {}) {
   // Collect turns with notes
   const turns = listTurns(session.session_id);
   if (turns.length === 0) {
+    if (wantJson) {
+      return JSON.stringify({
+        session_id: session.session_id,
+        turns: [],
+        total_cost: 0,
+        turns_with_cost: 0,
+        turns_with_model: 0,
+        model_totals: {},
+      });
+    }
     return 'No turns yet this session.';
   }
 
   const lines = [];
+  const jsonTurns = [];
   let totalCost = 0;
   let turnsWithCost = 0;
   let turnsWithModel = 0;
@@ -137,6 +149,31 @@ async function compute(args, opts = {}) {
       turnsWithCost++;
       modelTotals[modelDisplay] = (modelTotals[modelDisplay] || 0) + cost;
     }
+
+    if (wantJson) {
+      const numOrNull = (v) => (typeof v === 'number' ? v : null);
+      jsonTurns.push({
+        turn: turn_n,
+        session_id: session.session_id,
+        model: model,
+        input_tokens: usage ? numOrNull(usage.input_tokens) : null,
+        output_tokens: usage ? numOrNull(usage.output_tokens) : null,
+        cache_read_input_tokens: usage ? numOrNull(usage.cache_read_input_tokens) : null,
+        cache_creation_input_tokens: usage ? numOrNull(usage.cache_creation_input_tokens) : null,
+        cost: cost,
+      });
+    }
+  }
+
+  if (wantJson) {
+    return JSON.stringify({
+      session_id: session.session_id,
+      turns: jsonTurns,
+      total_cost: totalCost,
+      turns_with_cost: turnsWithCost,
+      turns_with_model: turnsWithModel,
+      model_totals: modelTotals,
+    });
   }
 
   lines.push(`\n  ${'-'.repeat(68)}`);
