@@ -220,4 +220,155 @@ describe('blame command', () => {
       assert.equal(cached, noCache);
     });
   });
+
+  describe('compute()/run() split + --json', () => {
+    test('compute(["work.txt"]) for a tracked file matches the run() text layout', () => {
+      const session = startSession();
+      makeTurn(session, 'v1', git);
+
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+      const result = compute(['work.txt']);
+      const lines = result.split('\n');
+      assert.equal(lines[0], 'Blame: work.txt');
+      assert.equal(lines[1], '');
+      const parsed = parseFormattedLine(lines[2]);
+      assert.equal(parsed.content, 'v1');
+      assert.match(parsed.attr, /^[0-9a-f]{8}:1$/);
+    });
+
+    test('compute(["untracked.txt"]) for an untracked-only file includes the marker line', () => {
+      const session = startSession();
+      makeUntrackedTurn(session, 'x1', git, { file: 'untracked.txt' });
+
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+      const result = compute(['untracked.txt']);
+      const lines = result.split('\n');
+      assert.equal(lines[1], '(untracked — annotated from turn snapshots)');
+    });
+
+    test('compute() throws the documented messages for usage/no-history/not-initialized', () => {
+      startSession();
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+      assert.throws(() => compute([]), { message: 'Usage: git turn blame <file> [--no-cache]' });
+      assert.throws(() => compute(['nonexistent.txt']), { message: 'git turn: no history for nonexistent.txt' });
+    });
+
+    test('compute() throws not-initialized when no session exists', () => {
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+      assert.throws(() => compute(['README.md']), { message: 'git turn: not initialized. Run `git turn init` first.' });
+    });
+
+    test('compute(["work.txt","--json"]) returns the documented tracked shape', () => {
+      const session = startSession();
+      makeTurn(session, 'v1', git);
+
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+      const parsed = JSON.parse(compute(['work.txt', '--json']));
+      assert.equal(parsed.file, 'work.txt');
+      assert.equal(parsed.tracked, true);
+      assert.deepEqual(parsed.warnings, []);
+      assert.equal(parsed.lines.length, 1);
+      assert.equal(parsed.lines[0].line, 1);
+      assert.match(parsed.lines[0].attribution, /^[0-9a-f]{8}:\d+$/);
+      assert.equal(parsed.lines[0].session_id, session.session_id);
+      assert.equal(parsed.lines[0].turn, 1);
+      assert.equal(parsed.lines[0].content, 'v1');
+    });
+
+    test('compute(["untracked.txt","--json"]) returns the same key set with tracked:false', () => {
+      const session = startSession();
+      makeUntrackedTurn(session, 'x1', git, { file: 'untracked.txt' });
+
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+      const parsed = JSON.parse(compute(['untracked.txt', '--json']));
+      assert.equal(parsed.file, 'untracked.txt');
+      assert.equal(parsed.tracked, false);
+      assert.deepEqual(parsed.warnings, []);
+      assert.equal(parsed.lines.length, 1);
+      assert.equal(parsed.lines[0].content, 'x1');
+    });
+
+    test('pre-session commit lines and uncommitted lines have null session_id/turn in --json', () => {
+      startSession();
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+      const notATurn = JSON.parse(compute(['README.md', '--json']));
+      assert.match(notATurn.lines[0].attribution, /\(not a turn\)$/);
+      assert.equal(notATurn.lines[0].session_id, null);
+      assert.equal(notATurn.lines[0].turn, null);
+
+      const session = startSession();
+      makeTurn(session, 'v1', git);
+      appendFileSync(join(process.cwd(), 'work.txt'), 'dirty\n');
+      delete require.cache[require.resolve('./blame')];
+      const { compute: compute2 } = require('./blame');
+      const uncommitted = JSON.parse(compute2(['work.txt', '--json']));
+      const dirtyLine = uncommitted.lines.find(l => l.content === 'dirty');
+      assert.ok(dirtyLine, 'expected a dirty line');
+      assert.equal(dirtyLine.attribution, '(uncommitted)');
+      assert.equal(dirtyLine.session_id, null);
+      assert.equal(dirtyLine.turn, null);
+    });
+
+    test('"--json" is not mistaken for the file argument', () => {
+      const session = startSession();
+      makeTurn(session, 'v1', git);
+
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+      const result = compute(['--json', 'work.txt']);
+      const parsed = JSON.parse(result);
+      assert.equal(parsed.file, 'work.txt');
+    });
+
+    test('duplicate head_sha collision: stderr sink called once, --json warnings populated, no-opts call writes nothing', () => {
+      const { updateRef, headSha: resolveHeadSha, currentBranch } = require('../git');
+      const { turnRef } = require('../session');
+
+      const session = startSession();
+      makeTurn(session, 'v1', git);
+      const head = resolveHeadSha();
+
+      // Craft a second turn ref whose snapshot message carries the SAME
+      // `head` line as the first, so buildHeadShaIndex sees a collision.
+      const dupMessage = [
+        'turn dup',
+        `session ${session.session_id}`,
+        `turn_n ${session.turn_n + 1}`,
+        'trigger fixture',
+        `head ${head}`,
+        `branch ${currentBranch()}`,
+        `created ${new Date().toISOString()}`,
+      ].join('\n');
+      const { commitSha } = require('../git').snapshotWorktree({ message: dupMessage });
+      session.turn_n += 1;
+      updateRef(turnRef(session.session_id, session.turn_n), commitSha);
+
+      delete require.cache[require.resolve('./blame')];
+      const { compute } = require('./blame');
+
+      const sinkCalls = [];
+      const resultWithSink = compute(['work.txt', '--no-cache'], { stderr: (s) => sinkCalls.push(s) });
+      assert.equal(sinkCalls.length, 1);
+      assert.equal(sinkCalls[0], 'git turn: warning: 1 duplicate head_sha value(s) in turn history; attribution may be ambiguous\n');
+      assert.ok(resultWithSink);
+
+      const origStderrWrite = process.stderr.write;
+      process.stderr.write = () => { throw new Error('unexpected process.stderr.write'); };
+      try {
+        assert.doesNotThrow(() => compute(['work.txt', '--no-cache']));
+      } finally {
+        process.stderr.write = origStderrWrite;
+      }
+
+      const jsonResult = JSON.parse(compute(['work.txt', '--json', '--no-cache']));
+      assert.deepEqual(jsonResult.warnings, ['1 duplicate head_sha value(s) in turn history; attribution may be ambiguous']);
+    });
+  });
 });
