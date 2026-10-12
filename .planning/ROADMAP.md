@@ -49,7 +49,7 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 
 ### 📋 v0.4 MCP Server (Phases 7-10)
 
-- [ ] **Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost`, make the full-line-highlight diff renderer the default (`--plain` restores today's output), and add a CLI-wide `--json` flag
+- [x] **Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost`, make the full-line-highlight diff renderer the default (`--plain` restores today's output), and add a CLI-wide `--json` flag (completed 2026-10-12)
 - [ ] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered
 - [ ] **Phase 9: Register Read-Only MCP Tools** - Wire up `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` as MCP tools
 - [ ] **Phase 10: End-to-End Verification with a Real MCP Client** - Claude Code exercises all 5 tools against a real session
@@ -87,7 +87,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 07-05-PLAN.md — compute() purity gate + CLI e2e test, docs (help/AGENTS/README), visual checkpoint [wave 3]
+- [x] 07-05-PLAN.md — compute() purity gate + CLI e2e test, docs (help/AGENTS/README), visual checkpoint [wave 3]
 
 ### Phase 8: MCP Server Scaffold
 
@@ -153,7 +153,7 @@ Plans:
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
 | 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
-| 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 4/5 | In Progress|  |
+| 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete   | 2026-10-12 |
 | 8. MCP server scaffold | v0.4 | 0/? | Planned | — |
 | 9. Register read-only MCP tools | v0.4 | 0/? | Planned | — |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
