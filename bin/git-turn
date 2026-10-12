@@ -14,10 +14,13 @@ if (!cmd || cmd === '--help' || cmd === '-h') {
 
 Commands:
   init                    Install post-commit hook in current repo
-  log                     List all turns in current session
-  show <N>                Full diff for turn N (with prompt if available)
-  diff <N> <M>            Diff between turn N and turn M
-  blame <file> [--no-cache]  Which turn last touched each line
+  log [--with-prompts] [--no-cache] [--json]
+                          List all turns in current session
+  show <N> [--with-prompts] [--plain] [--json]
+                          Full diff for turn N (with prompt if available)
+  diff <N> [M] [--plain] [--json]
+                          Diff turn N-1 vs N, or N vs M
+  blame <file> [--no-cache] [--json]  Which turn last touched each line
   bisect <cmd> [--no-cache]  Find the first turn where <cmd> fails
   heatmap [--no-cache]       Calendar heatmap of turn activity across all sessions
   revert <N>              Restore worktree to turn N state
@@ -27,7 +30,7 @@ Commands:
   gc [--keep-sessions N]  Prune old session refs
   gc --purge-notes       Permanently purge old note blobs from refs/notes/git-turn (see redact)
   session new|list        Manage sessions
-  cost                    Show token usage and cost for current session
+  cost [--all] [--json]   Show token usage and cost for current session
   record-prompt           Attach prompt/model/usage/latency metadata to the latest turn (JSON on stdin)
   redact <N>              Scrub a turn's captured prompt after the fact
   export [--since <ref>] [--output <path>]  Bundle git-turn refs for handoff to another repo

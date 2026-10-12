@@ -31,12 +31,12 @@ That installs the post-commit hook. Your next agent session starts capturing tur
 ## Commands
 
 ```
-git turn log                     List turns in the current session
+git turn log [--json]            List turns in the current session
 git turn status                  Session ID, turn count, hook health
-git turn diff <N>                Diff turn N-1 vs turn N
-git turn diff <N> <M>            Diff any two turns
-git turn show <N>                Full diff for turn N
-git turn blame <file>            Which turn last touched each line
+git turn diff <N> [--plain] [--json]       Diff turn N-1 vs turn N
+git turn diff <N> <M> [--plain] [--json]   Diff any two turns
+git turn show <N> [--plain] [--json]       Full diff for turn N
+git turn blame <file> [--json]   Which turn last touched each line
 git turn bisect <cmd>            Binary-search turns for the one that broke <cmd>
 git turn heatmap                 Calendar heatmap of turn activity across all sessions
 git turn revert <N>              Restore worktree to turn N state
@@ -44,11 +44,13 @@ git turn redo                    Undo the last revert
 git turn gc [--keep-sessions N]  Prune old session refs (default: keep 10)
 git turn gc --purge-notes        Permanently purge old note history from refs/notes/git-turn
 git turn redact <N>              Scrub a turn's captured prompt after the fact
-git turn cost [--all]            Token usage and estimated cost for the current (or all) sessions
+git turn cost [--all] [--json]   Token usage and estimated cost for the current (or all) sessions
 git turn session new [--from <session_id>:<turn_n>]  Start a session, optionally forked from a specific turn
 git turn session list            List every session, with turn counts and fork lineage
 git turn export [--since <ref>] [--output <path>]    Bundle git-turn refs for handoff to another repo
 ```
+
+`log`, `show`, `diff`, `blame` and `cost` also accept `--json` for structured output (and print `{"error": "..."}` on stdout with exit 1 on failure); `diff` and `show` accept `--plain` to get the old `git diff`-passthrough output instead of the rich default below. See AGENTS.md for the full JSON shapes.
 
 ## Example
 
@@ -61,8 +63,17 @@ Session: f17a78b9
   turn  3  7552932  fix: patch validation bug      1 file changed
 
 $ git turn diff 2 3
+Added 1 / removed 1
+
 diff --git a/src/auth/middleware.js b/src/auth/middleware.js
-...
+@@ -10,3 +10,3 @@
+10   function auth(req, res, next) {
+   -   const token = req.header('authorization');
+11 +   const token = req.headers.authorization;
+12   next();
+
+$ git turn log --json
+[{"turn":1,"sha":"872024f...","snapshot_sha":"a1b2c3...","subject":"feat: add auth middleware","files_changed":8,"insertions":120,"deletions":4}, ...]
 
 $ git turn revert 2
 Reverted to turn 2
