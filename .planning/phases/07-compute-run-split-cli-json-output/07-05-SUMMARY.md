@@ -38,12 +38,12 @@ key-decisions:
 requirements-completed: [REFACTOR-01, DIFF-01, JSON-01]
 
 duration: ~55min
-completed: 2026-10-08
+completed: 2026-10-12
 ---
 
 # Phase 7 Plan 05: Compute-purity probe, CLI e2e gate, and --json/--plain docs Summary
 
-**Cross-command compute() purity probe (REFACTOR-01) plus CLI e2e byte-identity/error-contract tests, and --json/--plain/rich-rendering documentation in --help, AGENTS.md, README.md — two of three tasks complete; the third is a human-verify checkpoint awaiting approval.**
+**Cross-command compute() purity probe (REFACTOR-01) plus CLI e2e byte-identity/error-contract tests, --json/--plain/rich-rendering documentation, and a human-approved visual check of the rich diff renderer — all three tasks complete.**
 
 ## Performance
 
@@ -64,9 +64,25 @@ completed: 2026-10-08
 
 1. **Task 1: Cross-command compute() purity probe + CLI end-to-end test** - `699f003` (test)
 2. **Task 2: Document --json, --plain and rich rendering (help, AGENTS.md, README.md)** - `a56ffe8` (docs)
-3. **Task 3: Visual check of rich diff rendering in a real terminal** - PENDING (checkpoint:human-verify, see below)
+3. **Task 3: Visual check of rich diff rendering in a real terminal** - APPROVED (checkpoint:human-verify, see below)
 
-**Plan metadata:** not yet committed (plan incomplete — paused at Task 3 checkpoint)
+## Checkpoint Resolution (Task 3)
+
+**Type:** checkpoint:human-verify, gate=blocking
+**Verdict:** APPROVED (2026-10-12)
+
+The orchestrator ran the plan's 6 verification steps in a scratch repo (`git turn init`, two real commits producing a two-turn diff) and confirmed structurally:
+
+1. **Default rich diff** (`git turn diff 2`): "Added 6 / removed 2" summary header first, dim diff/hunk headers (`\x1b[2m`), new-file-only gutter (blank for removed rows), full-row ANSI background highlighting (`\x1b[48;5;52m` dark red for removed, `\x1b[48;5;22m` dark green for added), `+`/`-`/space markers present on every content row, context rows correctly unhighlighted.
+2. **`show <N>`**: identical rich diff correctly rendered below the Turn/Model header block.
+3. **`NO_COLOR=1`**: gutter, summary, and markers preserved; zero ANSI escape bytes in output.
+4. **`--plain`**: byte-for-byte identical to the pre-phase foreground-only `git diff --color=always` passthrough (no gutter, no summary) — confirmed by direct terminal comparison.
+5. **`--json`**: `log --json` is a valid JSON array; `diff --json` returns `{from_turn, to_turn, sha_a, sha_b, diff, added, removed}` with correct added/removed counts (6/2, matching the summary header).
+6. **Narrow terminal** (width:40 override via direct `renderRich()` call): rows respect the width option, no crashes or broken highlighting at reduced width.
+
+The user accepted this structural/escape-code verification as sufficient evidence in lieu of personally re-running all 6 steps in their own terminal, and replied "approved."
+
+**Plan metadata:** committed in this update (plan now complete — all 3 tasks done)
 
 ## Files Created/Modified
 
@@ -118,14 +134,13 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-- Tasks 1 and 2 are complete and committed (`699f003`, `a56ffe8`); `npm test` is green (286/286) with both commits applied.
-- **Task 3 is a `checkpoint:human-verify` and has NOT been attempted or resolved** — this plan is NOT complete. A fresh agent/continuation must present the six how-to-verify steps in 07-05-PLAN.md Task 3 to the user and await an "approved" response (or a description of what looks wrong) before this plan can be marked done and its metadata commit created.
-- The automated pre-check for Task 3 (`NO_COLOR=1 node -e "...renderRich..."`) was run as a sanity check and passes, confirming the renderer function itself behaves as expected — this is NOT a substitute for the required human visual approval in a real terminal.
-- Do not update STATE.md/ROADMAP.md/REQUIREMENTS.md for this plan yet — those updates (including marking REFACTOR-01/DIFF-01/JSON-01 complete) should wait until Task 3 is approved and the plan is fully done, per the orchestrator's ownership of those shared files.
+- All 3 tasks complete and committed. Task 3's checkpoint was approved on 2026-10-12 after the orchestrator ran the plan's 6 verification steps against a real scratch repo (see Checkpoint Resolution above).
+- `npm test` reconfirmed green after the checkpoint resolution commit.
+- Orchestrator should now update STATE.md/ROADMAP.md/REQUIREMENTS.md to mark REFACTOR-01/DIFF-01/JSON-01 complete for Phase 7, per its ownership of those shared files.
 
 ---
 *Phase: 07-compute-run-split-cli-json-output*
-*Completed: Tasks 1-2 only, 2026-10-08 — plan incomplete, awaiting Task 3 checkpoint approval*
+*Completed: 2026-10-12 — all 3 tasks done, Task 3 checkpoint approved*
 
 ## Self-Check: PASSED
 
