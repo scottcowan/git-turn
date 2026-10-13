@@ -153,7 +153,7 @@ Plans:
 | 4. Secret redaction scanner | v0.3 | 1/1 | Complete    | 2026-09-17 |
 | 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
-| 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete   | 2026-10-12 |
+| 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete    | 2026-10-13 |
 | 8. MCP server scaffold | v0.4 | 0/? | Planned | — |
 | 9. Register read-only MCP tools | v0.4 | 0/? | Planned | — |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
