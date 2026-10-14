@@ -15,6 +15,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [x] **DIFF-01**: `diff`/`show` render a richer full-line-highlight format by default (full-row ANSI background per added/removed line, a line-number gutter, and an "Added N / removed M" summary header), replacing today's foreground-only `git diff --color=always` passthrough as the default; a `--plain` flag restores the exact current plain-text/foreground-color format byte-for-byte (this is what REFACTOR-01's byte-identical acceptance criterion is verified against)
 
+### Bug Fixes
+
+- [ ] **COST-01**: `git turn cost --all` actually reports across all sessions (not just the current one), using `blame-util.js`'s existing `listAllTurns({ noCache })` cross-session helper (the same pattern `blame`/`bisect`/`heatmap` already use) instead of the single-session `listTurns()` call — fixes a pre-existing no-op where `--all` was parsed but never applied
+
 ### MCP Server Infrastructure
 
 - [ ] **MCP-01**: `git turn mcp` starts a stdio MCP server implementing `initialize` / `notifications/initialized` / `tools/list` / `tools/call`, scoped to the cwd's repo (same scoping model as every other `git turn` command)
@@ -71,6 +75,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | REFACTOR-01 | Phase 7 | Complete |
 | DIFF-01 | Phase 7 | Complete |
+| COST-01 | Phase 8 | Pending |
 | MCP-01 | Phase 8 | Pending |
 | MCP-02 | Phase 8 | Pending |
 | MCP-03 | Phase 8 | Pending |
@@ -86,10 +91,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VERIFY-04 | Phase 10 | Pending |
 
 **Coverage:**
-- v1 requirements: 15 total
-- Mapped to phases: 15
+- v1 requirements: 16 total
+- Mapped to phases: 16
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-07 after folding DIFF-01 (rich diff renderer) into Phase 7 during discuss-phase*
+*Last updated: 2026-10-14 after folding COST-01 (cost --all fix) into Phase 8 during discuss-phase*

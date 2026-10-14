@@ -50,7 +50,7 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 ### 📋 v0.4 MCP Server (Phases 7-10)
 
 - [x] **Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost`, make the full-line-highlight diff renderer the default (`--plain` restores today's output), and add a CLI-wide `--json` flag (completed 2026-10-12)
-- [ ] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered
+- [ ] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered; also fixes the pre-existing `cost --all` no-op
 - [ ] **Phase 9: Register Read-Only MCP Tools** - Wire up `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` as MCP tools
 - [ ] **Phase 10: End-to-End Verification with a Real MCP Client** - Claude Code exercises all 5 tools against a real session
 
@@ -91,15 +91,16 @@ Plans:
 
 ### Phase 8: MCP Server Scaffold
 
-**Goal**: `git turn mcp` starts a long-running stdio MCP server, correctly scoped to the invoking repo, with no tools registered yet.
+**Goal**: `git turn mcp` starts a long-running stdio MCP server, correctly scoped to the invoking repo, with no tools registered yet. Also fixes a pre-existing bug: `cost --all` is parsed but never applied.
 **Depends on**: Phase 7
-**Requirements**: MCP-01, MCP-02, MCP-03
+**Requirements**: MCP-01, MCP-02, MCP-03, COST-01
 **Success Criteria** (what must be TRUE):
 
   1. Running `git turn mcp` inside a git-turn-initialized repo starts a stdio server that completes the `initialize`/`notifications/initialized` handshake with a real MCP client.
   2. Running `git turn mcp` inside a repo that has never run `git turn init` fails loudly on stderr and exits, without leaving a server process running.
   3. The server stays alive while its stdio stream is open and exits cleanly when stdin closes or on SIGINT, without being killed by any `process.exit` call reachable from its code path.
   4. The server captures cwd once at startup and never re-resolves the repo per tool call.
+  5. `git turn cost --all` reports token usage/cost across every session in the repo (not just the current one), using the same `listAllTurns({ noCache })` cross-session helper `blame`/`bisect`/`heatmap` already use.
 
 **Plans**: TBD
 

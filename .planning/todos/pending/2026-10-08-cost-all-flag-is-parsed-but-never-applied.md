@@ -2,6 +2,7 @@
 created: 2026-10-08T01:07:08.000Z
 title: cost --all flag is parsed but never applied
 area: cli
+resolves_phase: 8
 files:
   - src/commands/cost.js
 ---
