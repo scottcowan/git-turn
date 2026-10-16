@@ -78,6 +78,7 @@ Last activity: 2026-10-13
 - `2026-09-07-rich-diff-renderer.md` [cli] — optional enhancement over shipped color-diff
 - `2026-09-17-mindwalk-integration.md` [integration] — explore turn-boundary markers for mindwalk's session replay via a preprocessing script, not a fork
 - `2026-10-07-explore-stable-change-identity-beyond-sha-anchoring.md` [research] — inspired by Delta/DeltaDB's stable change-identity model; explore content-hash/diff-anchor fallback for blame/show/redact robustness to history rewrites, no multiplayer/cloud/new-VCS scope
+- `2026-10-16-claude-code-stop-hook-for-auto-record-prompt-capture.md` [integration] — write-direction counterpart to the v0.4 MCP server (read-direction); auto-feed `record-prompt` via a Claude Code Stop hook, maybe packaged as a plugin; revisit after Phase 10 ships
 
 ## Blockers/Concerns
 
