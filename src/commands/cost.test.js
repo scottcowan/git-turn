@@ -402,4 +402,131 @@ describe('cost command', () => {
       error: 'git turn: not initialized. Run `git turn init` first.',
     });
   });
+
+  // COST-01: --all spans every session via listAllTurns, not just the
+  // current one. Seeds a model/usage note directly (mirrors seedHookNote
+  // but with model/usage baked in) rather than driving record-prompt, since
+  // these tests build multi-session fixtures.
+  function seedTurnWithUsage(sess, model, usage) {
+    const { makeTurn } = require('../helpers/turn-fixtures');
+    const { addNote } = require('../git');
+    const { NOTES_REF } = require('../session');
+    const { headSha, snapshotSha, turn_n } = makeTurn(sess, JSON.stringify({ model, usage, turn: sess.turn_n }), repo.git);
+    addNote(NOTES_REF, headSha, JSON.stringify({
+      session_id: sess.session_id,
+      turn_n,
+      snapshot_sha: snapshotSha,
+      ts: '2026-09-18T00:00:00.000Z',
+      model,
+      usage,
+    }));
+    return { headSha, snapshotSha, turn_n };
+  }
+
+  describe('cost --all (COST-01)', () => {
+    const priceEntry = { input_cost_per_token: 0.000003, output_cost_per_token: 0.000015 };
+    function priceFor(usage) {
+      return usage.input_tokens * priceEntry.input_cost_per_token
+        + usage.output_tokens * priceEntry.output_cost_per_token;
+    }
+
+    test('Test A: plain text --all reports per-session blocks in order plus a grand total', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+
+      const a = session;
+      const usage1 = { input_tokens: 1000, output_tokens: 500 };
+      const usage2 = { input_tokens: 2000, output_tokens: 1000 };
+      seedTurnWithUsage(a, 'claude-sonnet-4-5', usage1);
+      seedTurnWithUsage(a, 'claude-sonnet-4-5', usage2);
+
+      const { startSession } = require('../helpers/turn-fixtures');
+      const b = startSession();
+      const usage3 = { input_tokens: 500, output_tokens: 250 };
+      seedTurnWithUsage(b, 'claude-sonnet-4-5', usage3);
+
+      delete require.cache[require.resolve('./cost')];
+      const result = await require('./cost').compute(['--all']);
+
+      const idxA = result.indexOf(`Session: ${a.session_id}`);
+      const idxB = result.indexOf(`Session: ${b.session_id}`);
+      assert.ok(idxA >= 0, 'missing session A header');
+      assert.ok(idxB >= 0, 'missing session B header');
+      assert.ok(idxA < idxB, 'session A header should come before session B header');
+
+      const occurrences = result.split('Session: ').length - 1;
+      assert.equal(occurrences, 2);
+
+      assert.match(result, /^Grand total across 2 sessions/m);
+      const grandIdx = result.search(/^Grand total across 2 sessions/m);
+      assert.ok(grandIdx > idxB, 'grand total should appear after session B header');
+
+      const expected = priceFor(usage1) + priceFor(usage2) + priceFor(usage3);
+      const grandLine = result.split('\n').find(l => l.startsWith('Grand total across'));
+      assert.ok(grandLine);
+      const m = /\$([\d.]+)\s*$/.exec(grandLine);
+      assert.ok(m, 'grand total line missing dollar amount');
+      assert.equal(m[1], expected.toFixed(4));
+    });
+
+    test('Test B: --all --json spans all sessions with per-turn session_id', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+
+      const a = session;
+      seedTurnWithUsage(a, 'claude-sonnet-4-5', { input_tokens: 1000, output_tokens: 500 });
+      seedTurnWithUsage(a, 'claude-sonnet-4-5', { input_tokens: 2000, output_tokens: 1000 });
+
+      const { startSession } = require('../helpers/turn-fixtures');
+      const b = startSession();
+      seedTurnWithUsage(b, 'claude-sonnet-4-5', { input_tokens: 500, output_tokens: 250 });
+
+      delete require.cache[require.resolve('./cost')];
+      const result = JSON.parse(await require('./cost').compute(['--all', '--json']));
+
+      assert.equal(result.turns.length, 3);
+      const sessionIds = new Set(result.turns.map(t => t.session_id));
+      assert.deepEqual(sessionIds, new Set([a.session_id, b.session_id]));
+
+      const expectedTotal = result.turns.reduce((s, t) => s + t.cost, 0);
+      assert.ok(Math.abs(result.total_cost - expectedTotal) < 1e-9);
+    });
+
+    test('Test C: cost without --all still reports only the current session', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+
+      const a = session;
+      seedTurnWithUsage(a, 'claude-sonnet-4-5', { input_tokens: 1000, output_tokens: 500 });
+
+      const { startSession } = require('../helpers/turn-fixtures');
+      const b = startSession();
+      seedTurnWithUsage(b, 'claude-sonnet-4-5', { input_tokens: 500, output_tokens: 250 });
+
+      delete require.cache[require.resolve('./cost')];
+      const result = await require('./cost').compute([]);
+
+      const occurrences = result.split('Session: ').length - 1;
+      assert.equal(occurrences, 1);
+      assert.match(result, new RegExp(`Session: ${b.session_id}`));
+      assert.ok(!result.includes(a.session_id));
+      assert.ok(!result.includes('Grand total'));
+    });
+
+    test('Test D: --all --no-cache returns the same turns via the ref-walk fallback', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+
+      const a = session;
+      seedTurnWithUsage(a, 'claude-sonnet-4-5', { input_tokens: 1000, output_tokens: 500 });
+      seedTurnWithUsage(a, 'claude-sonnet-4-5', { input_tokens: 2000, output_tokens: 1000 });
+
+      const { startSession } = require('../helpers/turn-fixtures');
+      const b = startSession();
+      seedTurnWithUsage(b, 'claude-sonnet-4-5', { input_tokens: 500, output_tokens: 250 });
+
+      delete require.cache[require.resolve('./cost')];
+      const result = JSON.parse(await require('./cost').compute(['--all', '--no-cache', '--json']));
+
+      assert.equal(result.turns.length, 3);
+      const sessionIds = new Set(result.turns.map(t => t.session_id));
+      assert.deepEqual(sessionIds, new Set([a.session_id, b.session_id]));
+    });
+  });
 });
