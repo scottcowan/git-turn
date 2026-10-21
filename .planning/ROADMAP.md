@@ -102,7 +102,17 @@ Plans:
   4. The server captures cwd once at startup and never re-resolves the repo per tool call.
   5. `git turn cost --all` reports token usage/cost across every session in the repo (not just the current one), using the same `listAllTurns({ noCache })` cross-session helper `blame`/`bisect`/`heatmap` already use.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 08-01-PLAN.md — COST-01: wire `cost --all` to `listAllTurns({ noCache })`, per-session blocks + grand total (D-04) [wave 1]
+- [ ] 08-02-PLAN.md — Human-gated install of `@modelcontextprotocol/server@2.3.1` + `zod@4.6.5` (exact pins, lockfile) [wave 1, checkpoint]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 08-03-PLAN.md — `git turn mcp`: `src/mcp/server.js` factory + `src/commands/mcp.js` serveStdio bootstrap, bin wiring, subprocess tests, AGENTS.md (MCP-01/02/03, D-01/02/03) [wave 2]
 
 ### Phase 9: Register Read-Only MCP Tools
 
