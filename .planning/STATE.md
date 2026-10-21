@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: MCP Server
 status: executing
-stopped_at: Phase 8 context gathered
-last_updated: "2026-10-21T08:29:42.701Z"
-last_activity: 2026-10-21 -- Phase 8 planning complete
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-10-21T17:29:55.052Z"
+last_activity: 2026-10-21
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
   percent: 20
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-07)
 
 **Core value:** Know exactly which agent turn broke your code — diff, blame, bisect, and revert at turn granularity.
-**Current focus:** Phase 8 — mcp server scaffold
+**Current focus:** Phase 8 — MCP Server Scaffold
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
+Phase: 8 (MCP Server Scaffold) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-10-21 -- Phase 8 planning complete
+Last activity: 2026-10-21
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Last activity: 2026-10-21 -- Phase 8 planning complete
 - Trend: n/a
 
 *Updated after each plan completion*
+| Phase 08 P01 | 50min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -71,6 +72,7 @@ Last activity: 2026-10-21 -- Phase 8 planning complete
 - [v0.4 roadmap]: `git_turn_revert`/`bisect`/`redact`/`record-prompt` are not phases this milestone — explicitly deferred (no MCP confirmation/elicitation pattern exists yet); tracked in REQUIREMENTS.md Future Requirements, not a roadmap placeholder.
 - [Phase 7 discuss]: Folded the pending rich-diff-renderer todo (2026-09-07) into Phase 7 as new requirement DIFF-01, per explicit user direction, since it touches the same `diff.js`/`show.js` files already being refactored. Resolved the conflict with REFACTOR-01's "byte-identical" acceptance bar by making the rich renderer the new default and adding `--plain` to restore exact current output — REFACTOR-01's acceptance criterion is now verified against the `--plain` path, not the unflagged default. The stable-change-identity todo (score 0.2) was reviewed but not folded — unrelated to this phase's scope.
 - [Phase 8 discuss]: Folded the pending `cost --all` no-op todo (2026-10-08) into Phase 8 as new requirement COST-01, per explicit user direction, even though it touches an unrelated file (`cost.js`, not the new `mcp.js`/`server.js`) — accepted as a small, well-understood bug fix bundled alongside the scaffold work. The mindwalk-integration and stable-change-identity todos were explicitly declined for folding (open-ended research, not implementation-ready; don't fit a phase whose deliverable is "server starts/stays alive/exits cleanly") and remain in the backlog.
+- [Phase ?]: COST-01 fixed by extracting renderSession() helper and grouping listAllTurns() results by session_id, matching the plan's prescribed refactor shape with no deviations
 
 ## Pending Todos
 
@@ -99,9 +101,9 @@ Last activity: 2026-10-21 -- Phase 8 planning complete
 
 ## Session Continuity
 
-Last session: 2026-10-20T08:54:45.015Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-mcp-server-scaffold/08-CONTEXT.md
+Last session: 2026-10-21T17:29:55.017Z
+Stopped at: Completed 08-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

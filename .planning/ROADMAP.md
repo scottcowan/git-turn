@@ -107,7 +107,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 08-01-PLAN.md — COST-01: wire `cost --all` to `listAllTurns({ noCache })`, per-session blocks + grand total (D-04) [wave 1]
+- [x] 08-01-PLAN.md — COST-01: wire `cost --all` to `listAllTurns({ noCache })`, per-session blocks + grand total (D-04) [wave 1]
 - [ ] 08-02-PLAN.md — Human-gated install of `@modelcontextprotocol/server@2.3.1` + `zod@4.6.5` (exact pins, lockfile) [wave 1, checkpoint]
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -165,7 +165,7 @@ Plans:
 | 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
 | 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete    | 2026-10-13 |
-| 8. MCP server scaffold | v0.4 | 0/? | Planned | — |
+| 8. MCP server scaffold | v0.4 | 1/3 | In Progress|  |
 | 9. Register read-only MCP tools | v0.4 | 0/? | Planned | — |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
 | 11. Warren integration | v1.0 | 0/? | Planned | — |

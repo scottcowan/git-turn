@@ -17,7 +17,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Bug Fixes
 
-- [ ] **COST-01**: `git turn cost --all` actually reports across all sessions (not just the current one), using `blame-util.js`'s existing `listAllTurns({ noCache })` cross-session helper (the same pattern `blame`/`bisect`/`heatmap` already use) instead of the single-session `listTurns()` call — fixes a pre-existing no-op where `--all` was parsed but never applied
+- [x] **COST-01**: `git turn cost --all` actually reports across all sessions (not just the current one), using `blame-util.js`'s existing `listAllTurns({ noCache })` cross-session helper (the same pattern `blame`/`bisect`/`heatmap` already use) instead of the single-session `listTurns()` call — fixes a pre-existing no-op where `--all` was parsed but never applied
 
 ### MCP Server Infrastructure
 
@@ -75,7 +75,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | REFACTOR-01 | Phase 7 | Complete |
 | DIFF-01 | Phase 7 | Complete |
-| COST-01 | Phase 8 | Pending |
+| COST-01 | Phase 8 | Complete |
 | MCP-01 | Phase 8 | Pending |
 | MCP-02 | Phase 8 | Pending |
 | MCP-03 | Phase 8 | Pending |
