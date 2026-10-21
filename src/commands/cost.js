@@ -6,7 +6,7 @@ const path = require('path');
 const os = require('os');
 const { gitDir, gitSafe } = require('../git');
 const { readSession, listTurns, NOTES_REF } = require('../session');
-const { parseSnapshotMessage } = require('../blame-util');
+const { parseSnapshotMessage, listAllTurns } = require('../blame-util');
 
 const PRICING_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -76,41 +76,10 @@ function computeCost(price, usage) {
   return input + output + cacheRead + cacheWrite;
 }
 
-async function compute(args, opts = {}) {
-  const session = readSession();
-  if (!session) {
-    throw new Error('git turn: not initialized. Run `git turn init` first.');
-  }
-
-  // Parse --all flag to show all sessions, not just current
-  const allSessions = args.includes('--all');
-  const wantJson = args.includes('--json');
-
-  let pricing;
-  if (opts.stderr) opts.stderr('Fetching pricing data...\r');
-  try {
-    pricing = await loadPricing();
-  } catch (e) {
-    throw new Error(`git turn: could not load pricing data: ${e.message}\nCheck your internet connection or try again later.`);
-  }
-  if (opts.stderr) opts.stderr('                        \r');
-
-  // Collect turns with notes
-  const turns = listTurns(session.session_id);
-  if (turns.length === 0) {
-    if (wantJson) {
-      return JSON.stringify({
-        session_id: session.session_id,
-        turns: [],
-        total_cost: 0,
-        turns_with_cost: 0,
-        turns_with_model: 0,
-        model_totals: {},
-      });
-    }
-    return 'No turns yet this session.';
-  }
-
+// Renders one session's turns into plain-text lines + JSON turn entries.
+// `entries` is [{ turn_n, head }] where `head` is the commit sha whose note
+// to read. Shared by the single-session path and each --all session block.
+function renderSession(sessionId, entries, pricing, wantJson) {
   const lines = [];
   const jsonTurns = [];
   let totalCost = 0;
@@ -118,13 +87,11 @@ async function compute(args, opts = {}) {
   let turnsWithModel = 0;
   const modelTotals = {};
 
-  lines.push(`Session: ${session.session_id}\n`);
+  lines.push(`Session: ${sessionId}\n`);
   lines.push(`  ${'Turn'.padEnd(5)}  ${'Model'.padEnd(30)}  ${'Input'.padStart(8)}  ${'Output'.padStart(8)}  ${'Cost'.padStart(10)}`);
   lines.push(`  ${'-'.repeat(5)}  ${'-'.repeat(30)}  ${'-'.repeat(8)}  ${'-'.repeat(8)}  ${'-'.repeat(10)}`);
 
-  for (const { turn_n, sha } of turns) {
-    const { headSha } = parseSnapshotMessage(sha);
-    const head = headSha || sha;
+  for (const { turn_n, head } of entries) {
     const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', head], { stdio: ['pipe', 'pipe', 'ignore'] });
     let meta = {};
     try { meta = note ? JSON.parse(note) : {}; } catch {}
@@ -154,7 +121,7 @@ async function compute(args, opts = {}) {
       const numOrNull = (v) => (typeof v === 'number' ? v : null);
       jsonTurns.push({
         turn: turn_n,
-        session_id: session.session_id,
+        session_id: sessionId,
         model: model,
         input_tokens: usage ? numOrNull(usage.input_tokens) : null,
         output_tokens: usage ? numOrNull(usage.output_tokens) : null,
@@ -165,21 +132,10 @@ async function compute(args, opts = {}) {
     }
   }
 
-  if (wantJson) {
-    return JSON.stringify({
-      session_id: session.session_id,
-      turns: jsonTurns,
-      total_cost: totalCost,
-      turns_with_cost: turnsWithCost,
-      turns_with_model: turnsWithModel,
-      model_totals: modelTotals,
-    });
-  }
-
   lines.push(`\n  ${'-'.repeat(68)}`);
 
   if (turnsWithCost > 0) {
-    lines.push(`  Total cost (${turnsWithCost}/${turns.length} turns): $${totalCost.toFixed(4)}`);
+    lines.push(`  Total cost (${turnsWithCost}/${entries.length} turns): $${totalCost.toFixed(4)}`);
     if (Object.keys(modelTotals).length > 1) {
       for (const [model, cost] of Object.entries(modelTotals)) {
         lines.push(`    ${model}: $${cost.toFixed(4)}`);
@@ -192,6 +148,125 @@ async function compute(args, opts = {}) {
   } else {
     lines.push(`\n  Models recorded but no token usage data.`);
     lines.push(`  Cost tracking requires token counts — these are not yet available from the Claude Code Stop hook.`);
+  }
+
+  return { lines, jsonTurns, totalCost, turnsWithCost, turnsWithModel, modelTotals };
+}
+
+async function compute(args, opts = {}) {
+  const session = readSession();
+  if (!session) {
+    throw new Error('git turn: not initialized. Run `git turn init` first.');
+  }
+
+  // Parse --all flag to show all sessions, not just current
+  const allSessions = args.includes('--all');
+  const wantJson = args.includes('--json');
+
+  let pricing;
+  if (opts.stderr) opts.stderr('Fetching pricing data...\r');
+  try {
+    pricing = await loadPricing();
+  } catch (e) {
+    throw new Error(`git turn: could not load pricing data: ${e.message}\nCheck your internet connection or try again later.`);
+  }
+  if (opts.stderr) opts.stderr('                        \r');
+
+  if (allSessions) {
+    const allTurns = listAllTurns({ noCache: args.includes('--no-cache') });
+    if (allTurns.length === 0) {
+      if (wantJson) {
+        return JSON.stringify({
+          session_id: session.session_id,
+          turns: [],
+          total_cost: 0,
+          turns_with_cost: 0,
+          turns_with_model: 0,
+          model_totals: {},
+        });
+      }
+      return 'No turns yet in any session.';
+    }
+
+    const groups = new Map();
+    for (const t of allTurns) {
+      if (!groups.has(t.session_id)) groups.set(t.session_id, []);
+      groups.get(t.session_id).push({ turn_n: t.turn_n, head: t.head_sha || t.snapshot_sha });
+    }
+    for (const entries of groups.values()) {
+      entries.sort((a, b) => a.turn_n - b.turn_n);
+    }
+
+    const sessionBlocks = [];
+    let grandTotal = 0;
+    let grandTurnsWithCost = 0;
+    let grandTurnCount = 0;
+    const grandModelTotals = {};
+    const grandJsonTurns = [];
+
+    for (const [sessionId, entries] of groups) {
+      const result = renderSession(sessionId, entries, pricing, wantJson);
+      sessionBlocks.push(result);
+      grandTotal += result.totalCost;
+      grandTurnsWithCost += result.turnsWithCost;
+      grandTurnCount += entries.length;
+      grandJsonTurns.push(...result.jsonTurns);
+      for (const [model, cost] of Object.entries(result.modelTotals)) {
+        grandModelTotals[model] = (grandModelTotals[model] || 0) + cost;
+      }
+    }
+
+    if (wantJson) {
+      return JSON.stringify({
+        session_id: session.session_id,
+        turns: grandJsonTurns,
+        total_cost: grandTotal,
+        turns_with_cost: grandTurnsWithCost,
+        turns_with_model: sessionBlocks.reduce((sum, r) => sum + r.turnsWithModel, 0),
+        model_totals: grandModelTotals,
+      });
+    }
+
+    const n = groups.size;
+    const plural = n === 1 ? 'session' : 'sessions';
+    const text = sessionBlocks.map(r => r.lines.join('\n')).join('\n\n')
+      + `\n\nGrand total across ${n} ${plural} (${grandTurnsWithCost}/${grandTurnCount} turns): $${grandTotal.toFixed(4)}`;
+    return text;
+  }
+
+  // Collect turns with notes
+  const turns = listTurns(session.session_id);
+  if (turns.length === 0) {
+    if (wantJson) {
+      return JSON.stringify({
+        session_id: session.session_id,
+        turns: [],
+        total_cost: 0,
+        turns_with_cost: 0,
+        turns_with_model: 0,
+        model_totals: {},
+      });
+    }
+    return 'No turns yet this session.';
+  }
+
+  const entries = turns.map(({ turn_n, sha }) => {
+    const { headSha } = parseSnapshotMessage(sha);
+    return { turn_n, head: headSha || sha };
+  });
+
+  const { lines, jsonTurns, totalCost, turnsWithCost, turnsWithModel, modelTotals } =
+    renderSession(session.session_id, entries, pricing, wantJson);
+
+  if (wantJson) {
+    return JSON.stringify({
+      session_id: session.session_id,
+      turns: jsonTurns,
+      total_cost: totalCost,
+      turns_with_cost: turnsWithCost,
+      turns_with_model: turnsWithModel,
+      model_totals: modelTotals,
+    });
   }
 
   return lines.join('\n');
