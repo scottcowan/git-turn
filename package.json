@@ -6,7 +6,7 @@
     "git-turn": "./bin/git-turn"
   },
   "scripts": {
-    "test": "node --test $(find src -name '*.test.js' ! -name 'mcp.test.js') && node --test src/commands/mcp.test.js"
+    "test": "F=$(find src -name '*.test.js' ! -name 'mcp.test.js'); if [ -z \"$F\" ]; then echo 'ERROR: no non-mcp test files found' >&2; exit 1; fi; node --test $F && node --test src/commands/mcp.test.js"
   },
   "keywords": [
     "git",
