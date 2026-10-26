@@ -9,7 +9,10 @@ const { realpathSync } = require('fs');
 const { makeTestRepo } = require('../helpers/test-repo');
 
 const BIN_PATH = join(__dirname, '..', '..', 'bin', 'git-turn');
-const SPAWN_TIMEOUT_MS = 5000;
+// Generous enough to tolerate contention when the full suite runs many
+// test files concurrently (each spawning real subprocesses) — the actual
+// operations here complete in well under 1s in isolation.
+const SPAWN_TIMEOUT_MS = 20000;
 
 // Wraps a promise so a hung child can never hang the suite — kills the
 // child with SIGKILL and rejects instead of waiting forever.
@@ -55,11 +58,9 @@ function spawnMcp(dir) {
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', chunk => { stderrBuf += chunk; });
 
-  let exited = null;
   const exitedPromise = new Promise(resolve => {
     child.on('exit', (code, signal) => {
-      exited = { code, signal };
-      resolve(exited);
+      resolve({ code, signal });
     });
   });
 
@@ -73,28 +74,59 @@ function spawnMcp(dir) {
     }).then(line => JSON.parse(line)), child, 'nextMessage()');
   }
 
+  // Created eagerly here (not lazily on first await), so the 5s timer
+  // starts at spawn time — callers that don't reach `await handle.exited`
+  // until later (e.g. after a handshake) must not trip Node's
+  // unhandledRejection detector in that gap. Attaching a silencing no-op
+  // .catch() immediately marks the promise "handled" for that detector
+  // while leaving the original promise's resolution/rejection intact for
+  // every real caller that awaits `exited` itself.
+  const exited = withTimeout(exitedPromise, child, 'exit event');
+  exited.catch(() => {});
+
   return {
     child,
     stdout: () => stdoutBuf,
     stderr: () => stderrBuf,
     nextMessage,
-    exited: withTimeout(exitedPromise, child, 'exit event'),
+    exited,
   };
 }
 
 describe('git turn mcp (MCP-01/02/03)', () => {
-  let dir, origCwd, origHome;
+  let dir, origCwd, origHome, liveHandle;
+
+  // Tracks the handle spawned by the current test so afterEach can always
+  // reap it — a test that throws before reaching its own kill/finally must
+  // never leave an orphaned child with open stdio pipes, which would keep
+  // this process's event loop alive and hang the whole suite (not just the
+  // one test).
+  function trackedSpawnMcp(d) {
+    liveHandle = spawnMcp(d);
+    return liveHandle;
+  }
 
   beforeEach(() => {
     origCwd = process.cwd();
     origHome = process.env.HOME;
+    liveHandle = null;
     const repo = makeTestRepo();
     dir = repo.dir;
     process.chdir(dir);
     process.env.HOME = dir;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    if (liveHandle && liveHandle.child.exitCode === null && liveHandle.child.signalCode === null) {
+      try { liveHandle.child.kill('SIGKILL'); } catch {}
+    }
+    if (liveHandle) {
+      try { liveHandle.child.stdout.destroy(); } catch {}
+      try { liveHandle.child.stderr.destroy(); } catch {}
+      try { liveHandle.child.stdin.destroy(); } catch {}
+      await liveHandle.exited.catch(() => {});
+    }
+    liveHandle = null;
     try { require('../cache').closeDb(); } catch {}
     process.chdir(origCwd);
     process.env.HOME = origHome;
@@ -102,7 +134,7 @@ describe('git turn mcp (MCP-01/02/03)', () => {
   });
 
   test('uninitialized repo fails loudly (MCP-02, D-03)', async () => {
-    const handle = spawnMcp(dir);
+    const handle = trackedSpawnMcp(dir);
     handle.child.stdin.end();
 
     const { code, signal } = await handle.exited;
@@ -116,7 +148,7 @@ describe('git turn mcp (MCP-01/02/03)', () => {
   test('handshake completes and returns git-turn serverInfo (MCP-01)', async () => {
     require('../helpers/turn-fixtures').startSession();
 
-    const handle = spawnMcp(dir);
+    const handle = trackedSpawnMcp(dir);
     try {
       handle.child.stdin.write(JSON.stringify({
         jsonrpc: '2.0',
@@ -148,7 +180,7 @@ describe('git turn mcp (MCP-01/02/03)', () => {
   test('D-01: stderr carries exactly one startup line scoped to the repo path', async () => {
     require('../helpers/turn-fixtures').startSession();
 
-    const handle = spawnMcp(dir);
+    const handle = trackedSpawnMcp(dir);
     try {
       handle.child.stdin.write(JSON.stringify({
         jsonrpc: '2.0',
@@ -173,7 +205,7 @@ describe('git turn mcp (MCP-01/02/03)', () => {
   test('stays alive while stdin open, exits cleanly on stdin close (MCP-03, D-02)', async () => {
     require('../helpers/turn-fixtures').startSession();
 
-    const handle = spawnMcp(dir);
+    const handle = trackedSpawnMcp(dir);
     handle.child.stdin.write(JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
@@ -205,7 +237,7 @@ describe('git turn mcp (MCP-01/02/03)', () => {
   test('exits cleanly on SIGINT (MCP-03, D-02)', async () => {
     require('../helpers/turn-fixtures').startSession();
 
-    const handle = spawnMcp(dir);
+    const handle = trackedSpawnMcp(dir);
     handle.child.stdin.write(JSON.stringify({
       jsonrpc: '2.0',
       id: 1,

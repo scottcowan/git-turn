@@ -6,7 +6,7 @@
     "git-turn": "./bin/git-turn"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test $(find src -name '*.test.js' ! -name 'mcp.test.js') && node --test src/commands/mcp.test.js"
   },
   "keywords": [
     "git",
