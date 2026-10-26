@@ -21,9 +21,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### MCP Server Infrastructure
 
-- [ ] **MCP-01**: `git turn mcp` starts a stdio MCP server implementing `initialize` / `notifications/initialized` / `tools/list` / `tools/call`, scoped to the cwd's repo (same scoping model as every other `git turn` command)
-- [ ] **MCP-02**: The server validates at startup that cwd is a git-turn-initialized repo, failing loudly on stderr if not, and never re-reads cwd per tool call
-- [ ] **MCP-03**: The server stays alive until its stdio stream closes and exits cleanly on stdin-close or SIGINT
+- [x] **MCP-01**: `git turn mcp` starts a stdio MCP server implementing `initialize` / `notifications/initialized` / `tools/list` / `tools/call`, scoped to the cwd's repo (same scoping model as every other `git turn` command)
+- [x] **MCP-02**: The server validates at startup that cwd is a git-turn-initialized repo, failing loudly on stderr if not, and never re-reads cwd per tool call
+- [x] **MCP-03**: The server stays alive until its stdio stream closes and exits cleanly on stdin-close or SIGINT
 
 ### MCP Tools (read-only)
 
@@ -76,9 +76,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REFACTOR-01 | Phase 7 | Complete |
 | DIFF-01 | Phase 7 | Complete |
 | COST-01 | Phase 8 | Complete |
-| MCP-01 | Phase 8 | Pending |
-| MCP-02 | Phase 8 | Pending |
-| MCP-03 | Phase 8 | Pending |
+| MCP-01 | Phase 8 | Complete |
+| MCP-02 | Phase 8 | Complete |
+| MCP-03 | Phase 8 | Complete |
 | MCP-04 | Phase 9 | Pending |
 | MCP-05 | Phase 9 | Pending |
 | MCP-06 | Phase 9 | Pending |
@@ -97,4 +97,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-14 after folding COST-01 (cost --all fix) into Phase 8 during discuss-phase*
+*Last updated: 2026-10-26 after Phase 8 (MCP Server Scaffold) completed — MCP-01/02/03/COST-01 marked complete*
