@@ -50,7 +50,7 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 ### 📋 v0.4 MCP Server (Phases 7-10)
 
 - [x] **Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost`, make the full-line-highlight diff renderer the default (`--plain` restores today's output), and add a CLI-wide `--json` flag (completed 2026-10-12)
-- [ ] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered; also fixes the pre-existing `cost --all` no-op
+- [x] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered; also fixes the pre-existing `cost --all` no-op (completed 2026-10-26)
 - [ ] **Phase 9: Register Read-Only MCP Tools** - Wire up `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` as MCP tools
 - [ ] **Phase 10: End-to-End Verification with a Real MCP Client** - Claude Code exercises all 5 tools against a real session
 
@@ -112,7 +112,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 08-03-PLAN.md — `git turn mcp`: `src/mcp/server.js` factory + `src/commands/mcp.js` serveStdio bootstrap, bin wiring, subprocess tests, AGENTS.md (MCP-01/02/03, D-01/02/03) [wave 2]
+- [x] 08-03-PLAN.md — `git turn mcp`: `src/mcp/server.js` factory + `src/commands/mcp.js` serveStdio bootstrap, bin wiring, subprocess tests, AGENTS.md (MCP-01/02/03, D-01/02/03) [wave 2]
 
 ### Phase 9: Register Read-Only MCP Tools
 
@@ -165,7 +165,7 @@ Plans:
 | 5. record-prompt note-write path | v0.3 | 3/3 | Complete    | 2026-09-20 |
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
 | 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete    | 2026-10-13 |
-| 8. MCP server scaffold | v0.4 | 2/3 | In Progress|  |
+| 8. MCP server scaffold | v0.4 | 3/3 | Complete   | 2026-10-26 |
 | 9. Register read-only MCP tools | v0.4 | 0/? | Planned | — |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
 | 11. Warren integration | v1.0 | 0/? | Planned | — |
