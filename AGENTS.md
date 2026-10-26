@@ -2,7 +2,7 @@
 
 `git-turn` is a git extension that snapshots the worktree after every commit an AI agent makes, grouped into "turns" within a session. Use it to inspect, diff, or roll back what an agent did — including mid-session, from inside your own tool loop.
 
-Run commands as `git turn <command>` (or `node <repo>/bin/git-turn <command>` if not installed globally). `log`, `show`, `diff`, `blame` and `cost` accept `--json`: compact JSON on stdout, no other output. On failure with `--json`, stdout is `{"error":"<message text>"}` (the same text that would otherwise go to stderr) and the exit code is 1 — the stdout/stderr/exit-code contract is identical whether `--json` is passed or not, only the success-path format differs (D-07). All other commands (`init`, `bisect`, `heatmap`, `revert`, `redo`, `branch`, `status`, `gc`, `session`, `record-prompt`, `redact`, `export`) print plain text only; parse that text if you need structured data from them.
+Run commands as `git turn <command>` (or `node <repo>/bin/git-turn <command>` if not installed globally). `log`, `show`, `diff`, `blame` and `cost` accept `--json`: compact JSON on stdout, no other output. On failure with `--json`, stdout is `{"error":"<message text>"}` (the same text that would otherwise go to stderr) and the exit code is 1 — the stdout/stderr/exit-code contract is identical whether `--json` is passed or not, only the success-path format differs (D-07). All other commands (`init`, `bisect`, `heatmap`, `revert`, `redo`, `branch`, `status`, `gc`, `session`, `record-prompt`, `redact`, `export`, `mcp`) print plain text only; parse that text if you need structured data from them.
 
 ## Setup (once per repo)
 
@@ -38,7 +38,10 @@ Calendar heatmap of turn activity. Like `blame`/`bisect` and unlike `log`/`show`
 Current session ID, turn count, and hook health (whether the post-commit hook is installed and wired to the right ref).
 
 ### `git turn cost [--all] [--json]`
-Token usage and estimated $ cost for the current session, computed from captured usage metadata and fetched LiteLLM pricing. `--all` reports across all sessions, not just the current one. `--json` prints `{ session_id, turns: [{ turn, session_id, model, input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens, cost }], total_cost, turns_with_cost, turns_with_model, model_totals }`.
+Token usage and estimated $ cost for the current session, computed from captured usage metadata and fetched LiteLLM pricing. `--all` reports across all sessions, not just the current one. `--json` prints `{ session_id, turns: [{ turn, session_id, model, input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens, cost }], total_cost, turns_with_cost, turns_with_model, model_totals }`. With `--all`, plain-text output prints one `Session: <id>` block (table + subtotal) per session in turn order, followed by a final `Grand total across N sessions (X/Y turns): $Z` line; `--json --all` returns a flat `turns` array spanning every session, each turn carrying its own `session_id`.
+
+### `git turn mcp`
+Starts a long-running stdio MCP server (`@modelcontextprotocol/server` v2, JSON-RPC on stdin/stdout) for MCP clients such as Claude Code to spawn as a subprocess — e.g. `claude mcp add git-turn -- git turn mcp`. Scoped once at startup to the current working directory's repo; cwd is never re-resolved per call. Fails with the exact message `git turn: not initialized. Run \`git turn init\` first.` on stderr and exit 1 if the repo has not been initialized, before any server starts. On successful startup prints one stderr line `git turn mcp: server started, scoped to <path>`. Stdout is reserved exclusively for JSON-RPC frames — never wrap this command in anything that writes to stdout. Exits 0 silently when stdin closes or on SIGINT. Registers zero tools in this release; the read-only `git_turn_log`/`_show`/`_diff`/`_blame`/`_cost` tools land in a future release.
 
 ### `git turn record-prompt`
 Reads one JSON object on stdin — `{ prompt, model, usage, latency_ms, tool_summary }`, all fields optional — and merges the supplied fields into the latest turn of the current session's note. Always targets the latest turn (no `--turn N` flag); the target is resolved via the turn index, never bare `HEAD`. Merges rather than overwrites, so repeat calls accumulate and the post-commit hook's `session_id`/`turn_n`/`snapshot_sha`/`ts` fields are always preserved. Unconditionally redacts secrets found in `prompt` — there is no opt-out flag — and reports a redaction count on stderr. `usage` is expected in Anthropic's shape (`input_tokens`/`output_tokens`/`cache_read_input_tokens`/`cache_creation_input_tokens`) so `git turn cost` can price it; `tool_summary` is a tool-name-to-count object, e.g. `{"Read": 5, "Edit": 2, "Bash": 1}`. Fails with `git turn: <message>` on stderr and exit 1 on malformed JSON, a non-string `prompt`, a non-object `usage`, empty stdin, or a session with no turns yet. Example:
@@ -95,4 +98,4 @@ Bundles just the git-turn ref namespace (`refs/git-turn/sessions/**`, `refs/note
 
 ## Requirements
 
-Node.js 22+, Git 2.x.
+Node.js 22+, Git 2.x. `git turn mcp` requires npm dependencies to be installed (`npm install` in the git-turn checkout) — every other command has no runtime dependencies, since `bin/git-turn` only loads the MCP SDK when `mcp` is invoked.
