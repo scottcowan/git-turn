@@ -91,3 +91,10 @@ None - no external service configuration required.
 ---
 *Phase: 09-register-read-only-mcp-tools*
 *Completed: 2026-11-01*
+
+## Self-Check: PASSED
+
+- FOUND: src/mcp/tools/roundtrip.test.js
+- FOUND: .planning/phases/09-register-read-only-mcp-tools/09-05-SUMMARY.md
+- FOUND: commit 85fa7f4 (test(09-05): live round-trip test across all 5 MCP tools via real hook + record-prompt)
+- FOUND: commit e4b8945 (docs(09-05): complete live MCP round-trip verification plan)
