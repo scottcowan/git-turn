@@ -294,4 +294,58 @@ describe('diff command', () => {
     assert.deepEqual(logs, ['{"error":"git turn: turn 9 not found"}']);
     assert.deepEqual(errs, []);
   });
+
+  test('Test A: opts.color false suppresses ANSI on rich branch under FORCE_COLOR', () => {
+    makeTurn('x');
+    makeTurn('y');
+    withEnv({ FORCE_COLOR: '1', NO_COLOR: undefined }, () => {
+      const output = compute(['1', '2'], { color: false });
+      assert.doesNotMatch(output, /\x1b\[/);
+    });
+  });
+
+  test('Test B: opts.color false suppresses ANSI on --plain branch under FORCE_COLOR', () => {
+    makeTurn('x');
+    makeTurn('y');
+    withEnv({ FORCE_COLOR: '1', NO_COLOR: undefined }, () => {
+      const output = compute(['1', '2', '--plain'], { color: false });
+      assert.doesNotMatch(output, /\x1b\[/);
+    });
+  });
+
+  test('Test C: opts.color false suppresses ANSI for single-turn form under FORCE_COLOR', () => {
+    makeTurn('a');
+    withEnv({ FORCE_COLOR: '1', NO_COLOR: undefined }, () => {
+      const output = compute(['1'], { color: false });
+      assert.doesNotMatch(output, /\x1b\[/);
+    });
+  });
+
+  test('Test D (regression guard T-09-01): no opts.color under FORCE_COLOR still colors', () => {
+    makeTurn('x');
+    makeTurn('y');
+    withEnv({ FORCE_COLOR: '1', NO_COLOR: undefined }, () => {
+      const output = compute(['1', '2']);
+      assert.match(output, /\x1b\[/);
+    });
+  });
+
+  test('Test E: opts.color true forces ANSI even under NO_COLOR', () => {
+    makeTurn('x');
+    makeTurn('y');
+    withEnv({ NO_COLOR: '1', FORCE_COLOR: undefined }, () => {
+      const output = compute(['1', '2'], { color: true });
+      assert.match(output, /\x1b\[/);
+    });
+  });
+
+  test('Test F: opts.color false under NO_COLOR equals default output under NO_COLOR byte-for-byte', () => {
+    makeTurn('x');
+    makeTurn('y');
+    withEnv({ NO_COLOR: '1', FORCE_COLOR: undefined }, () => {
+      const withOverride = compute(['1', '2'], { color: false });
+      const withoutOverride = compute(['1', '2']);
+      assert.equal(withOverride, withoutOverride);
+    });
+  });
 });

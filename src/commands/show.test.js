@@ -307,4 +307,85 @@ describe('show command', () => {
     assert.deepEqual(out, ['{"error":"git turn: turn 99 not found"}']);
     assert.deepEqual(err, []);
   });
+
+  test('Test A: tool_summary renders as "Tool summary: Read:2, Edit:1" in plain-text output', () => {
+    const { headSha, snapshotSha } = seedHookNote();
+    addNote(NOTES_REF, headSha, JSON.stringify({
+      session_id: session.session_id, turn_n: 1, snapshot_sha: snapshotSha,
+      ts: '2026-09-18T00:00:00.000Z', tool_summary: { Read: 2, Edit: 1 },
+    }));
+    const { compute } = require('./show');
+    const output = compute(['1']);
+    assert.match(output, /^Tool summary: Read:2, Edit:1$/m);
+  });
+
+  test('Test B: no tool_summary field -> no "Tool summary:" line', () => {
+    const { headSha, snapshotSha } = seedHookNote();
+    addNote(NOTES_REF, headSha, JSON.stringify({
+      session_id: session.session_id, turn_n: 1, snapshot_sha: snapshotSha,
+      ts: '2026-09-18T00:00:00.000Z',
+    }));
+    const { compute } = require('./show');
+    const output = compute(['1']);
+    assert.ok(!output.includes('Tool summary:'));
+  });
+
+  test('Test C: empty tool_summary object -> no "Tool summary:" line', () => {
+    const { headSha, snapshotSha } = seedHookNote();
+    addNote(NOTES_REF, headSha, JSON.stringify({
+      session_id: session.session_id, turn_n: 1, snapshot_sha: snapshotSha,
+      ts: '2026-09-18T00:00:00.000Z', tool_summary: {},
+    }));
+    const { compute } = require('./show');
+    const output = compute(['1']);
+    assert.ok(!output.includes('Tool summary:'));
+  });
+
+  test('Test D: opts.color false suppresses ANSI on rich branch under FORCE_COLOR', () => {
+    const { headSha } = seedHookNote();
+    withEnv({ FORCE_COLOR: '1', NO_COLOR: undefined }, () => {
+      const { compute } = require('./show');
+      const output = compute(['1'], { color: false });
+      assert.doesNotMatch(output, /\x1b\[/);
+    });
+  });
+
+  test('Test E: opts.color false suppresses ANSI on --plain branch under FORCE_COLOR', () => {
+    const { headSha } = seedHookNote();
+    withEnv({ FORCE_COLOR: '1', NO_COLOR: undefined }, () => {
+      const { compute } = require('./show');
+      const output = compute(['1', '--plain'], { color: false });
+      assert.doesNotMatch(output, /\x1b\[/);
+    });
+  });
+
+  test('Test F (regression guard T-09-01): no opts.color under FORCE_COLOR still colors', () => {
+    const { headSha } = seedHookNote();
+    withEnv({ FORCE_COLOR: '1', NO_COLOR: undefined }, () => {
+      const { compute } = require('./show');
+      const output = compute(['1']);
+      assert.match(output, /\x1b\[/);
+    });
+  });
+
+  test('Test G: opts.color true forces ANSI even under NO_COLOR', () => {
+    const { headSha } = seedHookNote();
+    withEnv({ NO_COLOR: '1', FORCE_COLOR: undefined }, () => {
+      const { compute } = require('./show');
+      const output = compute(['1'], { color: true });
+      assert.match(output, /\x1b\[/);
+    });
+  });
+
+  test('Test H: --json output unchanged — tool_summary deep-equals note data', () => {
+    const { headSha, snapshotSha } = seedHookNote();
+    const toolSummary = { Read: 2, Edit: 1 };
+    addNote(NOTES_REF, headSha, JSON.stringify({
+      session_id: session.session_id, turn_n: 1, snapshot_sha: snapshotSha,
+      ts: '2026-09-18T00:00:00.000Z', tool_summary: toolSummary,
+    }));
+    const { compute } = require('./show');
+    const parsed = JSON.parse(compute(['1', '--json']));
+    assert.deepEqual(parsed.tool_summary, toolSummary);
+  });
 });
