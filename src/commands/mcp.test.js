@@ -3,7 +3,7 @@
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { spawn } = require('child_process');
-const { rmSync, readFileSync } = require('fs');
+const { rmSync, readFileSync, readdirSync } = require('fs');
 const { join } = require('path');
 const { realpathSync } = require('fs');
 const { makeTestRepo } = require('../helpers/test-repo');
@@ -27,10 +27,10 @@ function withTimeout(promise, child, label) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-function spawnMcp(dir) {
+function spawnMcp(dir, extraEnv = {}) {
   const child = spawn(process.execPath, [BIN_PATH, 'mcp'], {
     cwd: dir,
-    env: { ...process.env, HOME: dir, NO_COLOR: '1' },
+    env: { ...process.env, HOME: dir, NO_COLOR: '1', ...extraEnv },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -94,23 +94,56 @@ function spawnMcp(dir) {
 }
 
 describe('git turn mcp (MCP-01/02/03)', () => {
-  let dir, origCwd, origHome, liveHandle;
+  let dir, origCwd, origHome, liveHandle, repo;
 
   // Tracks the handle spawned by the current test so afterEach can always
   // reap it — a test that throws before reaching its own kill/finally must
   // never leave an orphaned child with open stdio pipes, which would keep
   // this process's event loop alive and hang the whole suite (not just the
   // one test).
-  function trackedSpawnMcp(d) {
-    liveHandle = spawnMcp(d);
+  function trackedSpawnMcp(d, extraEnv) {
+    liveHandle = spawnMcp(d, extraEnv);
     return liveHandle;
+  }
+
+  // Sends initialize (same params as the existing handshake test), awaits
+  // the response, then sends notifications/initialized. Callers still need
+  // their own id-2+ requests via request().
+  async function handshake(handle) {
+    handle.child.stdin.write(JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2026-07-28',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '0' },
+      },
+    }) + '\n');
+    const response = await handle.nextMessage();
+    handle.child.stdin.write(JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'notifications/initialized',
+      params: {},
+    }) + '\n');
+    return response;
+  }
+
+  // Writes a JSON-RPC request frame and awaits the response with that id,
+  // skipping any message with a different id (e.g. server notifications).
+  async function request(handle, id, method, params) {
+    handle.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+    for (;;) {
+      const msg = await handle.nextMessage();
+      if (msg.id === id) return msg;
+    }
   }
 
   beforeEach(() => {
     origCwd = process.cwd();
     origHome = process.env.HOME;
     liveHandle = null;
-    const repo = makeTestRepo();
+    repo = makeTestRepo();
     dir = repo.dir;
     process.chdir(dir);
     process.env.HOME = dir;
@@ -281,5 +314,113 @@ describe('git turn mcp (MCP-01/02/03)', () => {
 
     const serverSrc = strip(readFileSync(join(__dirname, '..', 'mcp', 'server.js'), 'utf8'));
     assert.equal((serverSrc.match(/process\.cwd\(\)/g) || []).length, 0);
+  });
+
+  test('tools/list returns all 5 registered tools with valid schemas (MCP-04..08)', async () => {
+    require('../helpers/turn-fixtures').startSession();
+
+    const handle = trackedSpawnMcp(dir);
+    try {
+      await handshake(handle);
+      const response = await request(handle, 2, 'tools/list', {});
+
+      const names = response.result.tools.map(t => t.name).sort();
+      assert.deepEqual(names, ['git_turn_blame', 'git_turn_cost', 'git_turn_diff', 'git_turn_log', 'git_turn_show']);
+
+      for (const tool of response.result.tools) {
+        assert.equal(tool.inputSchema.type, 'object');
+        const props = tool.inputSchema.properties || {};
+        for (const key of Object.keys(props)) {
+          const desc = props[key].description || '';
+          assert.ok(desc.toLowerCase().includes(key.toLowerCase()) || desc.length > 0, `${tool.name}.${key} should have a non-empty description`);
+        }
+      }
+
+      const show = response.result.tools.find(t => t.name === 'git_turn_show');
+      assert.ok((show.inputSchema.required || []).includes('turn'));
+      const diff = response.result.tools.find(t => t.name === 'git_turn_diff');
+      assert.ok((diff.inputSchema.required || []).includes('turn'));
+      const blame = response.result.tools.find(t => t.name === 'git_turn_blame');
+      assert.ok((blame.inputSchema.required || []).includes('file'));
+    } finally {
+      handle.child.kill('SIGKILL');
+      await handle.exited.catch(() => {});
+    }
+  });
+
+  test('isError survives and server stays alive for the next call (MCP-09)', async () => {
+    const session = require('../helpers/turn-fixtures').startSession();
+    require('../helpers/turn-fixtures').makeTurn(session, 'a', repo.git);
+
+    const handle = trackedSpawnMcp(dir);
+    try {
+      await handshake(handle);
+
+      const badShow = await request(handle, 2, 'tools/call', { name: 'git_turn_show', arguments: { turn: 999 } });
+      assert.equal(badShow.result.isError, true);
+      assert.equal(badShow.result.content[0].text, 'git turn: turn 999 not found');
+      assert.equal(handle.child.exitCode, null);
+
+      const log = await request(handle, 3, 'tools/call', { name: 'git_turn_log', arguments: {} });
+      assert.notEqual(log.result.isError, true);
+      assert.ok(log.result.content[0].text.includes('Session:'));
+      assert.equal(handle.child.exitCode, null);
+    } finally {
+      handle.child.kill('SIGKILL');
+      await handle.exited.catch(() => {});
+    }
+  });
+
+  test('invalid args still answer and the server survives for a following tools/list', async () => {
+    const session = require('../helpers/turn-fixtures').startSession();
+    require('../helpers/turn-fixtures').makeTurn(session, 'a', repo.git);
+
+    const handle = trackedSpawnMcp(dir);
+    try {
+      await handshake(handle);
+
+      const bad = await request(handle, 2, 'tools/call', { name: 'git_turn_show', arguments: { turn: 'abc' } });
+      assert.ok(bad.error || bad.result?.isError === true);
+
+      const list = await request(handle, 3, 'tools/list', {});
+      assert.equal(list.result.tools.length, 5);
+    } finally {
+      handle.child.kill('SIGKILL');
+      await handle.exited.catch(() => {});
+    }
+  });
+
+  test('FORCE_COLOR=1 does not leak ANSI into show/diff tool output (MCP-10, D-02)', async () => {
+    const session = require('../helpers/turn-fixtures').startSession();
+    require('../helpers/turn-fixtures').makeTurn(session, 'a', repo.git);
+
+    const handle = trackedSpawnMcp(dir, { NO_COLOR: '', FORCE_COLOR: '1' });
+    try {
+      await handshake(handle);
+
+      const show = await request(handle, 2, 'tools/call', { name: 'git_turn_show', arguments: { turn: 1 } });
+      assert.notEqual(show.result.isError, true);
+      assert.equal(show.result.content[0].text.includes('\x1b['), false);
+
+      const diff = await request(handle, 3, 'tools/call', { name: 'git_turn_diff', arguments: { turn: 1 } });
+      assert.notEqual(diff.result.isError, true);
+      assert.equal(diff.result.content[0].text.includes('\x1b['), false);
+    } finally {
+      handle.child.kill('SIGKILL');
+      await handle.exited.catch(() => {});
+    }
+  });
+
+  test('src/mcp/tools files never call process.exit or .run(, and always route through commands/', () => {
+    const toolsDir = join(__dirname, '..', 'mcp', 'tools');
+    const strip = src => src.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+    const files = readdirSync(toolsDir).filter(f => f.endsWith('.js') && !f.endsWith('.test.js'));
+    assert.ok(files.length >= 5);
+    for (const file of files) {
+      const src = strip(readFileSync(join(toolsDir, file), 'utf8'));
+      assert.equal(src.includes('process.exit'), false, `${file} must not call process.exit`);
+      assert.equal(src.includes('.run('), false, `${file} must not call .run(`);
+      assert.ok(src.includes("require('../../commands/"), `${file} must require a command module`);
+    }
   });
 });
