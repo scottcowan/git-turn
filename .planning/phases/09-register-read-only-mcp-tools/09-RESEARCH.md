@@ -422,14 +422,14 @@ test('git_turn_diff out-of-range turn returns isError, does not throw', async ()
 | A1 | Exact wording/format for rendering `tool_summary` in `show.js`'s plain-text output (e.g. `"Tool summary: Read:2, Edit:1"`) is left to the planner/implementer's discretion — no existing convention to match since this line doesn't exist yet | Gap 1, Code Examples | Low — any reasonable human-readable rendering satisfies "including the tool_summary field"; only risk is a test asserting one exact string format that the implementation doesn't match, which is a test-authoring detail, not a design risk |
 | A2 | `ctx` (second handler parameter, `ServerContext`) can be safely ignored/omitted by all 5 handlers | registerTool API section | Low — confirmed from type signature that `ctx` is purely additional context (auth/session info for HTTP-mode servers); stdio-only read-only tools have no documented need for it |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exact `tool_summary` text rendering format**
+1. **Exact `tool_summary` text rendering format** — RESOLVED: locked by the planner to `"Tool summary: Read:2, Edit:1"` (09-01), tested exactly.
    - What we know: the data (`{ Read: 2, Edit: 1 }`-shaped object) is already available on `meta.tool_summary` inside `show.js`'s `compute()`, just not rendered to text yet.
    - What's unclear: whether the project wants a terse one-liner (`Tools: Read×2, Edit×1`) or a multi-line list — no existing precedent in this codebase to match.
    - Recommendation: planner picks one terse format (one line, comma-separated `name:count` pairs is simplest and matches the existing `Model:`/`Latency:` one-line-per-field convention already used in `show.js`), implementer writes a test asserting that exact format so it's locked going forward.
 
-2. **Does `src/mcp/tools/*.js` need its own `.test.js` file per tool, or one combined `src/mcp/tools/tools.test.js`?**
+2. **Does `src/mcp/tools/*.js` need its own `.test.js` file per tool, or one combined `src/mcp/tools/tools.test.js`?** — RESOLVED: one `.test.js` per tool (09-02/03/05), matching the recommendation below.
    - What we know: `src/commands/*.js` convention is one `.test.js` per command file; ARCHITECTURE.md's recommended structure mirrors one-file-per-tool.
    - What's unclear: whether test file granularity should mirror that 1:1, or group all 5 tools' success/error-path tests into one file since they're thin and mostly identical in shape.
    - Recommendation: mirror the existing 1:1 convention (`src/mcp/tools/show.test.js` next to `show.js`) for consistency with the rest of the codebase's test discovery/listing — plus the mcp.test.js subprocess-isolation lesson from Phase 8 doesn't apply here (these tests call `handler()` directly, no subprocess spawn, so no test-file-isolation concern).
