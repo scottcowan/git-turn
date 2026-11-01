@@ -111,3 +111,7 @@ None - no new network endpoints, auth paths, or trust-boundary surface introduce
 ---
 *Phase: 09-register-read-only-mcp-tools*
 *Completed: 2026-11-01*
+
+## Self-Check: PASSED
+
+All 6 created tool files and the SUMMARY.md verified present on disk; all 5 task/docs commits (2cb972f, 861a077, 455a07b, 4aa9322, 068fc15) verified present in `git log`.
