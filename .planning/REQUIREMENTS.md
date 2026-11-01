@@ -27,13 +27,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### MCP Tools (read-only)
 
-- [ ] **MCP-04**: `git_turn_log` tool mirrors `git turn log`'s output as text content (supports `with_prompts`/`no_cache` equivalents)
-- [ ] **MCP-05**: `git_turn_show` tool mirrors `git turn show <N>`'s output as text content, including the `tool_summary` field when present on the turn's note
-- [ ] **MCP-06**: `git_turn_diff` tool mirrors `git turn diff <N> [M]`'s output as text content
-- [ ] **MCP-07**: `git_turn_blame` tool mirrors `git turn blame <file>`'s output as text content
-- [ ] **MCP-08**: `git_turn_cost` tool mirrors `git turn cost [--all]`'s output as text content
-- [ ] **MCP-09**: Any error during a tool call (bad turn number, uninitialized repo, etc.) surfaces as an `isError: true` tool result carrying the same message text the CLI prints — never a thrown exception or `process.exit` that would kill the server
-- [ ] **MCP-10**: `show`/`diff` output is forced color-off in the MCP path regardless of TTY heuristics (an MCP client is never a TTY)
+- [x] **MCP-04**: `git_turn_log` tool mirrors `git turn log`'s output as text content (supports `with_prompts`/`no_cache` equivalents)
+- [x] **MCP-05**: `git_turn_show` tool mirrors `git turn show <N>`'s output as text content, including the `tool_summary` field when present on the turn's note
+- [x] **MCP-06**: `git_turn_diff` tool mirrors `git turn diff <N> [M]`'s output as text content
+- [x] **MCP-07**: `git_turn_blame` tool mirrors `git turn blame <file>`'s output as text content
+- [x] **MCP-08**: `git_turn_cost` tool mirrors `git turn cost [--all]`'s output as text content
+- [x] **MCP-09**: Any error during a tool call (bad turn number, uninitialized repo, etc.) surfaces as an `isError: true` tool result carrying the same message text the CLI prints — never a thrown exception or `process.exit` that would kill the server
+- [x] **MCP-10**: `show`/`diff` output is forced color-off in the MCP path regardless of TTY heuristics (an MCP client is never a TTY)
 
 ### CLI JSON Output
 
@@ -41,7 +41,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Verification
 
-- [ ] **VERIFY-03**: A live round-trip test (a real hook-written note read back through each MCP tool, not hand-built fixtures) proves the snapshot-sha-vs-HEAD-sha notes lookup bug class — already shipped and fixed twice (v0.2, v0.3) — does not regress a third time
+- [x] **VERIFY-03**: A live round-trip test (a real hook-written note read back through each MCP tool, not hand-built fixtures) proves the snapshot-sha-vs-HEAD-sha notes lookup bug class — already shipped and fixed twice (v0.2, v0.3) — does not regress a third time
 - [ ] **VERIFY-04**: A real MCP client (Claude Code) exercises all 5 tools against a real session with real turns; an out-of-range turn number or uninitialized-repo error surfaces as a recoverable tool error (not a server crash), and a subsequent unrelated tool call still succeeds in the same session
 
 ## Future Requirements
@@ -79,15 +79,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-01 | Phase 8 | Complete |
 | MCP-02 | Phase 8 | Complete |
 | MCP-03 | Phase 8 | Complete |
-| MCP-04 | Phase 9 | Pending |
-| MCP-05 | Phase 9 | Pending |
-| MCP-06 | Phase 9 | Pending |
-| MCP-07 | Phase 9 | Pending |
-| MCP-08 | Phase 9 | Pending |
-| MCP-09 | Phase 9 | Pending |
-| MCP-10 | Phase 9 | Pending |
+| MCP-04 | Phase 9 | Complete |
+| MCP-05 | Phase 9 | Complete |
+| MCP-06 | Phase 9 | Complete |
+| MCP-07 | Phase 9 | Complete |
+| MCP-08 | Phase 9 | Complete |
+| MCP-09 | Phase 9 | Complete |
+| MCP-10 | Phase 9 | Complete |
 | JSON-01 | Phase 7 | Complete |
-| VERIFY-03 | Phase 9 | Pending |
+| VERIFY-03 | Phase 9 | Complete |
 | VERIFY-04 | Phase 10 | Pending |
 
 **Coverage:**
@@ -97,4 +97,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-10-26 after Phase 8 (MCP Server Scaffold) completed — MCP-01/02/03/COST-01 marked complete*
+*Last updated: 2026-11-01 after Phase 9 (Register Read-Only MCP Tools) completed — MCP-04 through MCP-10 and VERIFY-03 marked complete*
