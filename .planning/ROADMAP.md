@@ -127,7 +127,22 @@ Plans:
   4. `git_turn_show`/`git_turn_diff` output is always colorless, regardless of the server process's TTY state.
   5. A live round-trip test — a real hook-written note read back through each tool, not a hand-built fixture — proves correct note/sha resolution, closing out the snapshot-sha-vs-HEAD-sha bug class that has shipped and been fixed twice before (v0.2, v0.3).
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 09-01-PLAN.md — `show.js` plain-text `Tool summary:` line + `opts.color` override on `show.js`/`diff.js` compute() (MCP-05/MCP-10, D-02) [wave 1]
+- [ ] 09-02-PLAN.md — `git_turn_log`/`_blame`/`_cost` tool adapters + per-tool tests (MCP-04/07/08/09, D-01/03/04) [wave 1]
+
+**Wave 2** *(blocked on 09-01)*
+
+- [ ] 09-03-PLAN.md — `git_turn_show`/`_diff` tool adapters with unconditional `{ color: false }` + tests (MCP-05/06/09/10) [wave 2]
+
+**Wave 3** *(blocked on 09-02, 09-03)*
+
+- [ ] 09-04-PLAN.md — Register all 5 tools in `createServer()`, stdio `tools/list`/`tools/call` protocol tests, AGENTS.md (criteria 1/3/4) [wave 3]
+- [ ] 09-05-PLAN.md — VERIFY-03 live round-trip: real installed hook + real `record-prompt` read back through all 5 handlers [wave 3]
 
 ### Phase 10: End-to-End Verification with a Real MCP Client
 
