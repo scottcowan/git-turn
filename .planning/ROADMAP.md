@@ -51,7 +51,7 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 
 - [x] **Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost`, make the full-line-highlight diff renderer the default (`--plain` restores today's output), and add a CLI-wide `--json` flag (completed 2026-10-12)
 - [x] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered; also fixes the pre-existing `cost --all` no-op (completed 2026-10-26)
-- [ ] **Phase 9: Register Read-Only MCP Tools** - Wire up `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` as MCP tools
+- [x] **Phase 9: Register Read-Only MCP Tools** - Wire up `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` as MCP tools (completed 2026-11-01)
 - [ ] **Phase 10: End-to-End Verification with a Real MCP Client** - Claude Code exercises all 5 tools against a real session
 
 ### 📋 v1.0 Warren Integration (Phase 11)
@@ -141,8 +141,8 @@ Plans:
 
 **Wave 3** *(blocked on 09-02, 09-03)*
 
-- [ ] 09-04-PLAN.md — Register all 5 tools in `createServer()`, stdio `tools/list`/`tools/call` protocol tests, AGENTS.md (criteria 1/3/4) [wave 3]
-- [ ] 09-05-PLAN.md — VERIFY-03 live round-trip: real installed hook + real `record-prompt` read back through all 5 handlers [wave 3]
+- [x] 09-04-PLAN.md — Register all 5 tools in `createServer()`, stdio `tools/list`/`tools/call` protocol tests, AGENTS.md (criteria 1/3/4) [wave 3]
+- [x] 09-05-PLAN.md — VERIFY-03 live round-trip: real installed hook + real `record-prompt` read back through all 5 handlers [wave 3]
 
 ### Phase 10: End-to-End Verification with a Real MCP Client
 
@@ -181,7 +181,7 @@ Plans:
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
 | 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete    | 2026-10-13 |
 | 8. MCP server scaffold | v0.4 | 3/3 | Complete   | 2026-10-26 |
-| 9. Register read-only MCP tools | v0.4 | 3/5 | In Progress|  |
+| 9. Register read-only MCP tools | v0.4 | 5/5 | Complete   | 2026-11-01 |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
 | 11. Warren integration | v1.0 | 0/? | Planned | — |
 
