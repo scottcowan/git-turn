@@ -61,13 +61,14 @@ function compute(args, opts = {}) {
     return JSON.stringify({ from_turn: fromTurn, to_turn: toTurn, sha_a: shaA, sha_b: shaB, diff: raw, added, removed });
   }
 
+  const colorOn = opts.color !== undefined ? opts.color : shouldColor();
   if (plain) {
-    const colorArg = shouldColor() ? '--color=always' : '--color=never';
+    const colorArg = colorOn ? '--color=always' : '--color=never';
     return gitSafe(['diff', colorArg, shaA, shaB]) || '(no changes)';
   }
 
   const raw = gitSafe(['diff', '--color=never', shaA, shaB]) || '';
-  return renderRich(raw, { color: shouldColor(), width: process.stdout.columns || 120 });
+  return renderRich(raw, { color: colorOn, width: process.stdout.columns || 120 });
 }
 
 function run(args) {
