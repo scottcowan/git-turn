@@ -132,8 +132,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 09-01-PLAN.md — `show.js` plain-text `Tool summary:` line + `opts.color` override on `show.js`/`diff.js` compute() (MCP-05/MCP-10, D-02) [wave 1]
-- [ ] 09-02-PLAN.md — `git_turn_log`/`_blame`/`_cost` tool adapters + per-tool tests (MCP-04/07/08/09, D-01/03/04) [wave 1]
+- [x] 09-01-PLAN.md — `show.js` plain-text `Tool summary:` line + `opts.color` override on `show.js`/`diff.js` compute() (MCP-05/MCP-10, D-02) [wave 1]
+- [x] 09-02-PLAN.md — `git_turn_log`/`_blame`/`_cost` tool adapters + per-tool tests (MCP-04/07/08/09, D-01/03/04) [wave 1]
 
 **Wave 2** *(blocked on 09-01)*
 
@@ -181,7 +181,7 @@ Plans:
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
 | 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete    | 2026-10-13 |
 | 8. MCP server scaffold | v0.4 | 3/3 | Complete   | 2026-10-26 |
-| 9. Register read-only MCP tools | v0.4 | 0/? | Planned | — |
+| 9. Register read-only MCP tools | v0.4 | 2/5 | In Progress|  |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
 | 11. Warren integration | v1.0 | 0/? | Planned | — |
 
