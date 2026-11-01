@@ -90,3 +90,13 @@ None - plan executed exactly as written. Both tasks matched the plan's `<action>
 ---
 *Phase: 09-register-read-only-mcp-tools*
 *Completed: 2026-11-01*
+
+## Self-Check: PASSED
+
+- FOUND: src/mcp/server.js
+- FOUND: AGENTS.md
+- FOUND: src/commands/mcp.test.js
+- FOUND: .planning/phases/09-register-read-only-mcp-tools/09-04-SUMMARY.md
+- FOUND commit: d348d1a (feat(09-04): register all 5 read-only MCP tools in createServer())
+- FOUND commit: 3cf787b (test(09-04): stdio protocol tests for tools/list, isError survival, FORCE_COLOR immunity)
+- FOUND commit: e80b041 (docs(09-04): add SUMMARY.md for register read-only MCP tools plan)
