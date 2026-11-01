@@ -137,7 +137,7 @@ Plans:
 
 **Wave 2** *(blocked on 09-01)*
 
-- [ ] 09-03-PLAN.md — `git_turn_show`/`_diff` tool adapters with unconditional `{ color: false }` + tests (MCP-05/06/09/10) [wave 2]
+- [x] 09-03-PLAN.md — `git_turn_show`/`_diff` tool adapters with unconditional `{ color: false }` + tests (MCP-05/06/09/10) [wave 2]
 
 **Wave 3** *(blocked on 09-02, 09-03)*
 
@@ -181,7 +181,7 @@ Plans:
 | 6. Verification, redact command & purge procedure | v0.3 | 4/4 | Complete    | 2026-09-21 |
 | 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete    | 2026-10-13 |
 | 8. MCP server scaffold | v0.4 | 3/3 | Complete   | 2026-10-26 |
-| 9. Register read-only MCP tools | v0.4 | 2/5 | In Progress|  |
+| 9. Register read-only MCP tools | v0.4 | 3/5 | In Progress|  |
 | 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
 | 11. Warren integration | v1.0 | 0/? | Planned | — |
 
