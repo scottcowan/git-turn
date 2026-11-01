@@ -71,17 +71,21 @@ function compute(args, opts = {}) {
   lines.push(`Turn ${turnN}  ${head.slice(0, 7)}  ${new Date(meta.ts || 0).toLocaleString()}`);
   if (meta.model) lines.push(`Model: ${meta.model}`);
   if (meta.latency_ms) lines.push(`Latency: ${meta.latency_ms}ms`);
+  if (meta.tool_summary && typeof meta.tool_summary === 'object' && !Array.isArray(meta.tool_summary) && Object.keys(meta.tool_summary).length > 0) {
+    lines.push('Tool summary: ' + Object.entries(meta.tool_summary).map(([k, v]) => `${k}:${v}`).join(', '));
+  }
   if (withPrompts && meta.prompt) {
     lines.push(`\nPrompt:\n  ${meta.prompt.replace(/\n/g, '\n  ')}`);
   }
   lines.push('');
 
+  const colorOn = opts.color !== undefined ? opts.color : shouldColor();
   if (plain) {
-    const colorArg = shouldColor() ? '--color=always' : '--color=never';
+    const colorArg = colorOn ? '--color=always' : '--color=never';
     lines.push(gitSafe(['diff', colorArg, shaA, shaB]) || '(no changes)');
   } else {
     const raw = gitSafe(['diff', '--color=never', shaA, shaB]) || '';
-    lines.push(renderRich(raw, { color: shouldColor(), width: process.stdout.columns || 120 }));
+    lines.push(renderRich(raw, { color: colorOn, width: process.stdout.columns || 120 }));
   }
 
   return lines.join('\n');
