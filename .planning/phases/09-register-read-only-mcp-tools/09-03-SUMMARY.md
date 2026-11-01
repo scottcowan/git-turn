@@ -96,3 +96,15 @@ None - plan executed exactly as written. Both adapters matched the `09-PATTERNS.
 ---
 *Phase: 09-register-read-only-mcp-tools*
 *Completed: 2026-11-01*
+
+## Self-Check: PASSED
+
+- FOUND: src/mcp/tools/show.js
+- FOUND: src/mcp/tools/show.test.js
+- FOUND: src/mcp/tools/diff.js
+- FOUND: src/mcp/tools/diff.test.js
+- FOUND: .planning/phases/09-register-read-only-mcp-tools/09-03-SUMMARY.md
+- FOUND commit: a4c0ae4 (test(09-03): add failing test for git_turn_show adapter)
+- FOUND commit: d58e521 (feat(09-03): implement git_turn_show MCP tool adapter)
+- FOUND commit: 9eb4d43 (test(09-03): add failing test for git_turn_diff adapter)
+- FOUND commit: 33c8610 (feat(09-03): implement git_turn_diff MCP tool adapter)
