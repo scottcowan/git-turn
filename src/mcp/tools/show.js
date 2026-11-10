@@ -4,7 +4,7 @@ const { z } = require('zod');
 const { compute } = require('../../commands/show');
 
 async function handler({ turn, withPrompts } = {}) {
-  if (!Number.isInteger(turn)) {
+  if (!Number.isInteger(turn) || turn < 1) {
     return { content: [{ type: 'text', text: 'git turn: turn is required' }], isError: true };
   }
   const argv = [String(turn), withPrompts && '--with-prompts'].filter(Boolean);

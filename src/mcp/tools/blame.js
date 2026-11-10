@@ -7,6 +7,9 @@ async function handler({ file, noCache } = {}) {
   if (typeof file !== 'string' || file === '') {
     return { content: [{ type: 'text', text: 'git turn: file is required' }], isError: true };
   }
+  if (file.startsWith('-')) {
+    return { content: [{ type: 'text', text: 'git turn: file must not start with "-"' }], isError: true };
+  }
   const argv = [file, noCache && '--no-cache'].filter(Boolean);
   try {
     // blame.js's opts.stderr is a terminal-only duplicate-sha warning sink —

@@ -4,10 +4,10 @@ const { z } = require('zod');
 const { compute } = require('../../commands/diff');
 
 async function handler({ turn, toTurn } = {}) {
-  if (!Number.isInteger(turn)) {
+  if (!Number.isInteger(turn) || turn < 1) {
     return { content: [{ type: 'text', text: 'git turn: turn is required' }], isError: true };
   }
-  if (toTurn !== undefined && !Number.isInteger(toTurn)) {
+  if (toTurn !== undefined && !Number.isInteger(toTurn) || toTurn < 1) {
     return { content: [{ type: 'text', text: 'git turn: toTurn must be a number' }], isError: true };
   }
   const argv = [String(turn), toTurn !== undefined ? String(toTurn) : null].filter(v => v !== null);
