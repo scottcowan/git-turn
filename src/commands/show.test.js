@@ -319,6 +319,34 @@ describe('show command', () => {
     assert.match(output, /^Tool summary: Read:2, Edit:1$/m);
   });
 
+  describe('tool_summary delimiter guard (D-10)', () => {
+    function summaryLines(ts) {
+      const { headSha, snapshotSha } = seedHookNote();
+      addNote(NOTES_REF, headSha, JSON.stringify({
+        session_id: session.session_id, turn_n: 1, snapshot_sha: snapshotSha,
+        ts: '2026-09-18T00:00:00.000Z', tool_summary: ts,
+      }));
+      const { compute } = require('./show');
+      return compute(['1']).split('\n').filter(l => l.startsWith('Tool summary:'));
+    }
+
+    test('strips : , CR LF from keys', () => {
+      assert.deepEqual(summaryLines({ 'Bash: x,y': 3 }), ['Tool summary: Bash xy:3']);
+    });
+
+    test('newline in key cannot inject a line', () => {
+      assert.deepEqual(summaryLines({ 'Re\nad': 1 }), ['Tool summary: Read:1']);
+    });
+
+    test('skips non-primitive values', () => {
+      assert.deepEqual(summaryLines({ Read: { nested: 1 }, Edit: 2, A: true, B: null, C: [1] }), ['Tool summary: Edit:2']);
+    });
+
+    test('no line when every entry is skipped', () => {
+      assert.deepEqual(summaryLines({ Read: { n: 1 } }), []);
+    });
+  });
+
   test('Test B: no tool_summary field -> no "Tool summary:" line', () => {
     const { headSha, snapshotSha } = seedHookNote();
     addNote(NOTES_REF, headSha, JSON.stringify({
