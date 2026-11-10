@@ -167,13 +167,13 @@ Plans:
 **Goal:** Clear the v0.4 milestone-audit tech debt before archiving: `git turn mcp` reports startup failures as `git turn: <message>` and always exits 0 on SIGINT within ~2s, `git turn cost` never reads a note keyed by a snapshot sha, malformed usage cannot poison cost totals, and stale help/comments/bookkeeping match reality. No new capabilities.
 **Requirements**: none (tech debt; decisions D-01..D-10 in 10.1-CONTEXT.md)
 **Depends on:** Phase 10
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] 10.1-01-PLAN.md — mcp.js try/catch around serveStdio, bounded SIGINT shutdown, stale comment + `--help` text, rewrite Pitfall-3 static test (D-04..D-07) [wave 1]
-- [ ] 10.1-02-PLAN.md — cost.js unresolved head never falls back to snapshot sha at both sites; finite usage guard, /i prefix strip, HTTP status check (D-01..D-03, D-09) [wave 1]
-- [ ] 10.1-03-PLAN.md — renderRich spread-free gutter, colon-filename blame characterization, tool_summary delimiter guard (D-09, D-10) [wave 1]
-- [ ] 10.1-04-PLAN.md — MCP adapter direct-call arg guards; 08-VERIFICATION/09-01-SUMMARY bookkeeping; close stale cost --all todo (D-08, D-10) [wave 1]
+- [x] 10.1-01-PLAN.md — mcp.js try/catch around serveStdio, bounded SIGINT shutdown, stale comment + `--help` text, rewrite Pitfall-3 static test (D-04..D-07) [wave 1]
+- [x] 10.1-02-PLAN.md — cost.js unresolved head never falls back to snapshot sha at both sites; finite usage guard, /i prefix strip, HTTP status check (D-01..D-03, D-09) [wave 1]
+- [x] 10.1-03-PLAN.md — renderRich spread-free gutter, colon-filename blame characterization, tool_summary delimiter guard (D-09, D-10) [wave 1]
+- [x] 10.1-04-PLAN.md — MCP adapter direct-call arg guards; 08-VERIFICATION/09-01-SUMMARY bookkeeping; close stale cost --all todo (D-08, D-10) [wave 1]
 
 ### Phase 11: Warren integration
 
