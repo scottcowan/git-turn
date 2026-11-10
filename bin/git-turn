@@ -34,7 +34,7 @@ Commands:
   record-prompt           Attach prompt/model/usage/latency metadata to the latest turn (JSON on stdin)
   redact <N>              Scrub a turn's captured prompt after the fact
   export [--since <ref>] [--output <path>]  Bundle git-turn refs for handoff to another repo
-  mcp                     Start a stdio MCP server scoped to the current repo (no tools yet)
+  mcp                     Start a stdio MCP server scoped to the current repo
 `);
   process.exit(0);
 }
