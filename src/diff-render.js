@@ -95,7 +95,7 @@ function renderRich(rawText, { color = false, width = 120 } = {}) {
   }
 
   const allLineNos = files.flatMap(f => f.hunks.flatMap(h => h.lines.map(l => l.newLineNo || 0)));
-  const gutterWidth = String(Math.max(1, ...allLineNos)).length;
+  const gutterWidth = String(allLineNos.reduce((m, n) => Math.max(m, n), 1)).length;
 
   files.forEach((file, fileIdx) => {
     if (fileIdx > 0) out.push('');

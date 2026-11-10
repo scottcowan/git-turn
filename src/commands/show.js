@@ -5,6 +5,24 @@ const { readSession, listTurns, NOTES_REF } = require('../session');
 const { parseSnapshotMessage } = require('../blame-util');
 const { renderRich, parseDiff, EMPTY_TREE } = require('../diff-render');
 
+// Render tool_summary as `name:count` pairs; strip delimiter/newline chars and
+// skip non-primitive values so a crafted note cannot corrupt the line (D-10).
+function formatToolSummary(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const clean = x => String(x).replace(/[:,\r\n]/g, '').trim();
+  const parts = [];
+  for (const [k, v] of Object.entries(obj)) {
+    let val;
+    if (typeof v === 'number' && Number.isFinite(v)) val = String(v);
+    else if (typeof v === 'string') val = clean(v);
+    else continue;
+    const key = clean(k);
+    if (!key) continue;
+    parts.push(`${key}:${val}`);
+  }
+  return parts.length ? parts.join(', ') : null;
+}
+
 function compute(args, opts = {}) {
   const session = readSession();
   if (!session) {
@@ -71,9 +89,8 @@ function compute(args, opts = {}) {
   lines.push(`Turn ${turnN}  ${head.slice(0, 7)}  ${new Date(meta.ts || 0).toLocaleString()}`);
   if (meta.model) lines.push(`Model: ${meta.model}`);
   if (meta.latency_ms) lines.push(`Latency: ${meta.latency_ms}ms`);
-  if (meta.tool_summary && typeof meta.tool_summary === 'object' && !Array.isArray(meta.tool_summary) && Object.keys(meta.tool_summary).length > 0) {
-    lines.push('Tool summary: ' + Object.entries(meta.tool_summary).map(([k, v]) => `${k}:${v}`).join(', '));
-  }
+  const toolSummaryText = formatToolSummary(meta.tool_summary);
+  if (toolSummaryText) lines.push('Tool summary: ' + toolSummaryText);
   if (withPrompts && meta.prompt) {
     lines.push(`\nPrompt:\n  ${meta.prompt.replace(/\n/g, '\n  ')}`);
   }

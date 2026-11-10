@@ -261,4 +261,14 @@ describe('annotateFromSnapshots', () => {
     assert.equal(result[2].turn.turn_n, t3.turn_n);
     void t2;
   });
+
+  test('untracked file with colon in name is attributed (WR-04 characterization)', () => {
+    const session = startSession();
+    const t1 = makeUntrackedTurn(session, 'hello', git, { file: 'a:b.txt' });
+    const turns = orderByCommitTopology(listAllTurns());
+    const result = annotateFromSnapshots('a:b.txt', turns);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].content, 'hello');
+    assert.equal(result[0].turn.turn_n, t1.turn_n);
+  });
 });
