@@ -3,6 +3,7 @@ phase: 09-register-read-only-mcp-tools
 plan: 01
 subsystem: cli-commands
 tags: [mcp-prerequisite, color-handling, tool-summary]
+requirements-completed: [MCP-05, MCP-10]
 dependency-graph:
   requires: []
   provides:

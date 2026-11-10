@@ -3,6 +3,8 @@ created: 2026-10-08T01:07:08.000Z
 title: cost --all flag is parsed but never applied
 area: cli
 resolves_phase: 8
+completed: 2026-11-10
+resolution: fixed by COST-01 in Phase 8
 files:
   - src/commands/cost.js
 ---
