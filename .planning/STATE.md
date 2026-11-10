@@ -4,8 +4,8 @@ milestone: v0.4
 milestone_name: MCP Server
 status: executing
 stopped_at: Phase 10.1 context gathered
-last_updated: "2026-11-10T21:09:45.559Z"
-last_activity: 2026-11-10 -- Phase 10.1 planning complete
+last_updated: "2026-11-10T21:18:09.569Z"
+last_activity: 2026-11-10 -- Phase 10.1 execution started
 progress:
   total_phases: 6
   completed_phases: 4
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-07)
 
 **Core value:** Know exactly which agent turn broke your code — diff, blame, bisect, and revert at turn granularity.
-**Current focus:** Phase 10.1 — Address v0.4 tech debt
+**Current focus:** Phase 10.1 — address-v0-4-tech-debt
 
 ## Current Position
 
-Phase: 10.1 (Address v0.4 tech debt: mcp.js hardening, head_sha fallback, stale help text) — INSERTED, not yet discussed
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-11-10 -- Phase 10.1 planning complete
+Phase: 10.1 (address-v0-4-tech-debt) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 10.1
+Last activity: 2026-11-10 -- Phase 10.1 execution started
 
 ## Performance Metrics
 
