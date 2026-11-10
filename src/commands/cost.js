@@ -72,9 +72,9 @@ function lookupPrice(pricing, model) {
   return null;
 }
 
-// null/undefined mean "absent" (0); anything else must be a finite number.
+// null/undefined mean "absent" (0); anything else must be a finite, non-negative number.
 function isTokenCount(v) {
-  return typeof v === 'number' && Number.isFinite(v);
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0;
 }
 
 const USAGE_FIELDS = ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'];
@@ -93,7 +93,8 @@ function computeCost(price, usage) {
 
 // Renders one session's turns into plain-text lines + JSON turn entries.
 // `entries` is [{ turn_n, head }] where `head` is the turn's original commit
-// sha, or null when unresolved (in which case no note is read). Shared by the single-session path and each --all session block.
+// sha, or null when unresolved (in which case no note is read).
+// Shared by the single-session path and each --all session block.
 function renderSession(sessionId, entries, pricing, wantJson) {
   const lines = [];
   const jsonTurns = [];
