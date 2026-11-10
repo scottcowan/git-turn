@@ -5,11 +5,16 @@ const { readSession, listTurns, NOTES_REF } = require('../session');
 const { parseSnapshotMessage } = require('../blame-util');
 const { renderRich, parseDiff, EMPTY_TREE } = require('../diff-render');
 
+// Strip C0/DEL control chars (incl. ESC) so crafted notes cannot inject terminal escapes.
+function stripCtl(x) {
+  return String(x).replace(/[\x00-\x1f\x7f]/g, '');
+}
+
 // Render tool_summary as `name:count` pairs; strip delimiter/newline chars and
 // skip non-primitive values so a crafted note cannot corrupt the line (D-10).
 function formatToolSummary(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
-  const clean = x => String(x).replace(/[:,\r\n]/g, '').trim();
+  const clean = x => String(x).replace(/[\x00-\x1f\x7f:,]/g, '').trim();
   const parts = [];
   for (const [k, v] of Object.entries(obj)) {
     let val;
@@ -87,8 +92,8 @@ function compute(args, opts = {}) {
 
   // Header
   lines.push(`Turn ${turnN}  ${head.slice(0, 7)}  ${new Date(meta.ts || 0).toLocaleString()}`);
-  if (meta.model) lines.push(`Model: ${meta.model}`);
-  if (meta.latency_ms) lines.push(`Latency: ${meta.latency_ms}ms`);
+  if (meta.model) lines.push(`Model: ${stripCtl(meta.model)}`);
+  if (meta.latency_ms) lines.push(`Latency: ${stripCtl(meta.latency_ms)}ms`);
   const toolSummaryText = formatToolSummary(meta.tool_summary);
   if (toolSummaryText) lines.push('Tool summary: ' + toolSummaryText);
   if (withPrompts && meta.prompt) {
