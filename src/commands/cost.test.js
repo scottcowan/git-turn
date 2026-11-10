@@ -529,4 +529,155 @@ describe('cost command', () => {
       assert.deepEqual(sessionIds, new Set([a.session_id, b.session_id]));
     });
   });
+
+  describe('unresolved head (D-01/D-02/D-03)', () => {
+    const priceEntry = { input_cost_per_token: 0.000003, output_cost_per_token: 0.000015 };
+    const planted = JSON.stringify({ model: 'claude-sonnet-4-5', usage: { input_tokens: 1000, output_tokens: 500 } });
+
+    // Hand-built turn whose snapshot message has no `head` line, with a note
+    // planted ON THE SNAPSHOT SHA (the wrong key the old fallback would read).
+    function makeHeadlessTurn(content) {
+      const { snapshotWorktree, updateRef, addNote } = require('../git');
+      const { incrementTurn, turnRef, NOTES_REF } = require('../session');
+      writeFileSync(join(process.cwd(), 'work.txt'), content + '\n');
+      repo.git(['add', '.']);
+      repo.git(['commit', '-q', '-m', 'headless ' + (session.turn_n + 1)]);
+      const { commitSha } = snapshotWorktree({
+        message: `turn ${session.turn_n + 1}\nsession ${session.session_id}\nturn_n ${session.turn_n + 1}`,
+      });
+      incrementTurn(session);
+      updateRef(turnRef(session.session_id, session.turn_n), commitSha);
+      addNote(NOTES_REF, commitSha, planted);
+      return commitSha;
+    }
+
+    function freshCost() {
+      delete require.cache[require.resolve('./cost')];
+      return require('./cost');
+    }
+
+    test('single-session --json: null head yields null model/cost and counts in totals', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+      makeHeadlessTurn('h1');
+      const r = JSON.parse(await freshCost().compute(['--json']));
+      assert.equal(r.turns.length, 1);
+      assert.equal(r.turns[0].model, null);
+      assert.equal(r.turns[0].cost, null);
+      assert.equal(r.turns[0].input_tokens, null);
+      assert.equal(r.turns_with_model, 0);
+      assert.equal(r.turns_with_cost, 0);
+      assert.equal(r.total_cost, 0);
+    });
+
+    test('single-session plain text: shows (no model recorded), no sonnet', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+      makeHeadlessTurn('h1');
+      const text = await freshCost().compute([]);
+      assert.match(text, /\(no model recorded\)/);
+      assert.ok(!text.includes('sonnet'));
+    });
+
+    test('--all (cache and --no-cache): null head yields null model', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+      makeHeadlessTurn('h1');
+      for (const flags of [['--all', '--json'], ['--all', '--no-cache', '--json']]) {
+        const r = JSON.parse(await freshCost().compute(flags));
+        assert.equal(r.turns.length, 1);
+        assert.equal(r.turns[0].model, null);
+        assert.equal(r.turns[0].cost, null);
+        assert.equal(r.turns_with_model, 0);
+      }
+    });
+
+    test('mixed session: resolved turn priced, unresolved null, denominator 2', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+      seedHookNote();
+      runWithStdin({ model: 'claude-sonnet-4-5', usage: { input_tokens: 1000, output_tokens: 500 } });
+      makeHeadlessTurn('h2');
+      const r = JSON.parse(await freshCost().compute(['--json']));
+      assert.equal(r.turns.length, 2);
+      assert.ok(r.turns[0].cost > 0);
+      assert.equal(r.turns[1].cost, null);
+      assert.equal(r.turns[1].model, null);
+      assert.equal(r.turns_with_cost, 1);
+    });
+
+    test('computeCost returns null for non-finite usage fields (WR-01)', () => {
+      const { computeCost } = require('./cost');
+      const price = { input_per_mtok: 3, output_per_mtok: 15, cache_read_per_mtok: 0, cache_write_per_mtok: 0 };
+      assert.equal(computeCost(price, { input_tokens: 'abc' }), null);
+      assert.equal(computeCost(price, { output_tokens: {} }), null);
+      assert.equal(computeCost(price, { input_tokens: Infinity }), null);
+      assert.equal(computeCost(price, { input_tokens: NaN }), null);
+      assert.ok(Number.isFinite(computeCost(price, { input_tokens: 1000, output_tokens: null })));
+    });
+
+    test('string usage field: totals stay finite, bad turn cost null, row shows ?', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+      seedHookNote();
+      runWithStdin({ model: 'claude-sonnet-4-5', usage: { input_tokens: 1000, output_tokens: 500 } });
+      const { makeTurn } = require('../helpers/turn-fixtures');
+      const { addNote } = require('../git');
+      const { NOTES_REF } = require('../session');
+      const t2 = makeTurn(session, 'b', repo.git);
+      addNote(NOTES_REF, t2.headSha, JSON.stringify({ model: 'claude-sonnet-4-5', usage: { input_tokens: '1000', output_tokens: 5 } }));
+      const r = JSON.parse(await freshCost().compute(['--json']));
+      assert.ok(Number.isFinite(r.total_cost));
+      assert.equal(r.turns[1].cost, null);
+      assert.equal(r.total_cost, r.turns[0].cost);
+      const text = await freshCost().compute([]);
+      assert.ok(!text.includes('NaN'));
+      const row = text.split('\n').find(l => /^\s+2\s/.test(l));
+      assert.match(row, /\?/);
+      assert.ok(!row.includes('"1000"') && !/\s1000\s/.test(row));
+    });
+
+    test('model prefix strip is case-insensitive (WR-02)', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+      const { makeTurn } = require('../helpers/turn-fixtures');
+      const { addNote } = require('../git');
+      const { NOTES_REF } = require('../session');
+      const t = makeTurn(session, 'a', repo.git);
+      addNote(NOTES_REF, t.headSha, JSON.stringify({ model: 'US.anthropic.claude-sonnet-4-5', usage: { input_tokens: 1, output_tokens: 1 } }));
+      const text = await freshCost().compute([]);
+      assert.match(text, /\s claude-sonnet-4-5\s/);
+      assert.ok(!/US\.anthropic/.test(text));
+    });
+
+    test('fetchPricing rejects on non-200 status (IN-03)', async () => {
+      const https = require('https');
+      const { EventEmitter } = require('events');
+      const c = freshCost();
+      const origGet = https.get;
+      https.get = (url, cb) => {
+        const req = new EventEmitter();
+        req.setTimeout = () => {};
+        const res = new EventEmitter();
+        res.statusCode = 404;
+        res.resume = () => {};
+        process.nextTick(() => cb(res));
+        return req;
+      };
+      try {
+        await assert.rejects(c.fetchPricing(), /404/);
+      } finally {
+        https.get = origGet;
+      }
+    });
+
+    test('no stderr writes during compute (D-03)', async () => {
+      seedFakePricing(dir, 'claude-sonnet-4-5', priceEntry);
+      makeHeadlessTurn('h1');
+      const origWrite = process.stderr.write;
+      let calls = 0;
+      process.stderr.write = function () { calls++; return true; };
+      try {
+        await freshCost().compute([]);
+        await freshCost().compute(['--all']);
+      } finally {
+        process.stderr.write = origWrite;
+      }
+      assert.equal(calls, 0);
+    });
+  });
 });
