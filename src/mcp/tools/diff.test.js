@@ -107,3 +107,14 @@ describe('git_turn_diff tool', () => {
     }
   });
 });
+
+describe('git_turn_diff direct-call guards', () => {
+  test('missing turn / bad toTurn return isError', async () => {
+    const expected = { content: [{ type: 'text', text: 'git turn: turn is required' }], isError: true };
+    assert.deepEqual(await handler({}), expected);
+    assert.deepEqual(await handler({ turn: undefined }), expected);
+    assert.deepEqual(await handler(), expected);
+    assert.deepEqual(await handler({ turn: 1, toTurn: 'x' }),
+      { content: [{ type: 'text', text: 'git turn: toTurn must be a number' }], isError: true });
+  });
+});

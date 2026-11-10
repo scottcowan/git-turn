@@ -109,3 +109,12 @@ describe('git_turn_show tool', () => {
     }
   });
 });
+
+describe('git_turn_show direct-call guards', () => {
+  test('missing turn returns isError without computing', async () => {
+    const expected = { content: [{ type: 'text', text: 'git turn: turn is required' }], isError: true };
+    assert.deepEqual(await handler({}), expected);
+    assert.deepEqual(await handler({ turn: undefined }), expected);
+    assert.deepEqual(await handler(), expected);
+  });
+});

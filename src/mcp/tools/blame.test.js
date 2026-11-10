@@ -86,3 +86,11 @@ describe('git_turn_blame tool', () => {
     assert.equal(calls, 0);
   });
 });
+
+describe('git_turn_blame direct-call guards', () => {
+  test('missing or empty file returns isError', async () => {
+    const expected = { content: [{ type: 'text', text: 'git turn: file is required' }], isError: true };
+    assert.deepEqual(await handler({}), expected);
+    assert.deepEqual(await handler({ file: '' }), expected);
+  });
+});

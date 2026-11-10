@@ -4,6 +4,9 @@ const { z } = require('zod');
 const { compute } = require('../../commands/blame');
 
 async function handler({ file, noCache } = {}) {
+  if (typeof file !== 'string' || file === '') {
+    return { content: [{ type: 'text', text: 'git turn: file is required' }], isError: true };
+  }
   const argv = [file, noCache && '--no-cache'].filter(Boolean);
   try {
     // blame.js's opts.stderr is a terminal-only duplicate-sha warning sink —
