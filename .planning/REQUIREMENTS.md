@@ -42,7 +42,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Verification
 
 - [x] **VERIFY-03**: A live round-trip test (a real hook-written note read back through each MCP tool, not hand-built fixtures) proves the snapshot-sha-vs-HEAD-sha notes lookup bug class — already shipped and fixed twice (v0.2, v0.3) — does not regress a third time
-- [ ] **VERIFY-04**: A real MCP client (Claude Code) exercises all 5 tools against a real session with real turns; an out-of-range turn number or uninitialized-repo error surfaces as a recoverable tool error (not a server crash), and a subsequent unrelated tool call still succeeds in the same session
+- [x] **VERIFY-04**: A real MCP client (Claude Code) exercises all 5 tools against a real session with real turns; an out-of-range turn number or uninitialized-repo error surfaces as a recoverable tool error (not a server crash), and a subsequent unrelated tool call still succeeds in the same session
 
 ## Future Requirements
 
@@ -88,7 +88,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-10 | Phase 9 | Complete |
 | JSON-01 | Phase 7 | Complete |
 | VERIFY-03 | Phase 9 | Complete |
-| VERIFY-04 | Phase 10 | Pending |
+| VERIFY-04 | Phase 10 | Complete |
 
 **Coverage:**
 - v1 requirements: 16 total
@@ -97,4 +97,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-07*
-*Last updated: 2026-11-01 after Phase 9 (Register Read-Only MCP Tools) completed — MCP-04 through MCP-10 and VERIFY-03 marked complete*
+*Last updated: 2026-11-10 after Phase 10 (End-to-End Verification) completed — VERIFY-04 marked complete; all 16 v0.4 requirements complete*
