@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: MCP Server
-status: executing
-stopped_at: Phase 10 context gathered
-last_updated: "2026-11-10T16:16:27.315Z"
-last_activity: 2026-11-10 -- Phase 10 execution started
+status: Ready to discuss
+stopped_at: Phase 10.1 context gathered
+last_updated: "2026-11-10T20:49:02.035Z"
+last_activity: 2026-11-10 -- Phase 10.1 inserted after Phase 10 (v0.4 tech-debt cleanup)
 progress:
-  total_phases: 5
-  completed_phases: 3
+  total_phases: 6
+  completed_phases: 4
   total_plans: 14
-  completed_plans: 13
-  percent: 60
+  completed_plans: 14
+  percent: 67
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-07)
 
 **Core value:** Know exactly which agent turn broke your code — diff, blame, bisect, and revert at turn granularity.
-**Current focus:** Phase 10 — End-to-End Verification with a Real MCP Client
+**Current focus:** Phase 10.1 — Address v0.4 tech debt
 
 ## Current Position
 
-Phase: 10 (End-to-End Verification with a Real MCP Client) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 10
-Last activity: 2026-11-10 -- Phase 10 execution started
+Phase: 10.1 (Address v0.4 tech debt: mcp.js hardening, head_sha fallback, stale help text) — INSERTED, not yet discussed
+Plan: Not started
+Status: Ready to discuss
+Last activity: 2026-11-10 -- Phase 10.1 inserted after Phase 10 (v0.4 tech-debt cleanup)
 
 ## Performance Metrics
 
@@ -102,10 +102,16 @@ Last activity: 2026-11-10 -- Phase 10 execution started
 
 ## Session Continuity
 
-Last session: 2026-11-06T17:23:38.424Z
-Stopped at: Phase 10 context gathered
-Resume file: .planning/phases/10-end-to-end-verification-with-a-real-mcp-client/10-CONTEXT.md
+Last session: 2026-11-10T20:49:02.029Z
+Stopped at: Phase 10.1 context gathered
+Resume file: .planning/phases/10.1-address-v0-4-tech-debt-mcp-js-hardening-head-sha-fallback-st/10.1-CONTEXT.md
 
 ## Operator Next Steps
 
 - Review and approve the v0.4 roadmap, then run `/gsd-plan-phase 7`
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 10.1 inserted after Phase 10: Address v0.4 tech debt: mcp.js hardening, head_sha fallback, stale help text (from v0.4 milestone audit)
