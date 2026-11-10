@@ -52,7 +52,7 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 - [x] **Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost`, make the full-line-highlight diff renderer the default (`--plain` restores today's output), and add a CLI-wide `--json` flag (completed 2026-10-12)
 - [x] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered; also fixes the pre-existing `cost --all` no-op (completed 2026-10-26)
 - [x] **Phase 9: Register Read-Only MCP Tools** - Wire up `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` as MCP tools (completed 2026-11-01)
-- [ ] **Phase 10: End-to-End Verification with a Real MCP Client** - Claude Code exercises all 5 tools against a real session
+- [x] **Phase 10: End-to-End Verification with a Real MCP Client** - Claude Code exercises all 5 tools against a real session (completed 2026-11-10)
 
 ### 📋 v1.0 Warren Integration (Phase 11)
 
@@ -160,7 +160,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 10-01-PLAN.md — Live Claude Code check: register local-scope git-turn MCP servers, call all 5 tools + out-of-range/uninitialized errors + recovery (human checkpoint), record 10-HUMAN-UAT.md, close 08-HUMAN-UAT, clean up [wave 1]
+- [x] 10-01-PLAN.md — Live Claude Code check: register local-scope git-turn MCP servers, call all 5 tools + out-of-range/uninitialized errors + recovery (human checkpoint), record 10-HUMAN-UAT.md, close 08-HUMAN-UAT, clean up [wave 1]
 
 ### Phase 11: Warren integration
 
@@ -187,7 +187,7 @@ Plans:
 | 7. Compute/run split, rich diff rendering & CLI JSON output | v0.4 | 5/5 | Complete    | 2026-10-13 |
 | 8. MCP server scaffold | v0.4 | 3/3 | Complete   | 2026-10-26 |
 | 9. Register read-only MCP tools | v0.4 | 5/5 | Complete   | 2026-11-01 |
-| 10. End-to-end verification with a real MCP client | v0.4 | 0/? | Planned | — |
+| 10. End-to-end verification with a real MCP client | v0.4 | 1/1 | Complete   | 2026-11-10 |
 | 11. Warren integration | v1.0 | 0/? | Planned | — |
 
 Also shipped ad hoc, untracked by any phase (same pattern as Phase 2's SQLite cache): `session new`/`session list` (fork lineage) and `export` (cross-repo ref bundle) — commit `7b446ce`, 2026-09-06.
