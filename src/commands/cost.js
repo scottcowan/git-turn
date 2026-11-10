@@ -18,6 +18,11 @@ function pricingCachePath() {
 function fetchPricing() {
   return new Promise((resolve, reject) => {
     const req = https.get(PRICING_URL, res => {
+      if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error('pricing fetch failed: HTTP ' + res.statusCode));
+        return;
+      }
       let data = '';
       res.on('data', chunk => { data += chunk; });
       res.on('end', () => {
@@ -67,8 +72,18 @@ function lookupPrice(pricing, model) {
   return null;
 }
 
+// null/undefined mean "absent" (0); anything else must be a finite number.
+function isTokenCount(v) {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+const USAGE_FIELDS = ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'];
+
 function computeCost(price, usage) {
   if (!price || !usage) return null;
+  for (const f of USAGE_FIELDS) {
+    if (usage[f] != null && !isTokenCount(usage[f])) return null;
+  }
   const input = (usage.input_tokens || 0) * price.input_per_mtok / 1_000_000;
   const output = (usage.output_tokens || 0) * price.output_per_mtok / 1_000_000;
   const cacheRead = (usage.cache_read_input_tokens || 0) * price.cache_read_per_mtok / 1_000_000;
@@ -106,9 +121,10 @@ function renderSession(sessionId, entries, pricing, wantJson) {
     const price = model ? lookupPrice(pricing, model) : null;
     const cost = computeCost(price, usage);
 
-    const modelDisplay = model ? model.replace(/^(eu|us|ap|au)\.anthropic\./, '') : '(no model recorded)';
-    const inputDisplay = usage ? String(usage.input_tokens || 0).padStart(8) : '       ?';
-    const outputDisplay = usage ? String(usage.output_tokens || 0).padStart(8) : '       ?';
+    const modelDisplay = model ? model.replace(/^(eu|us|ap|au)\.anthropic\./i, '') : '(no model recorded)';
+    const tokDisplay = (v) => (usage && (v == null || isTokenCount(v)) ? String(v || 0).padStart(8) : '       ?');
+    const inputDisplay = tokDisplay(usage && usage.input_tokens);
+    const outputDisplay = tokDisplay(usage && usage.output_tokens);
     const costDisplay = cost !== null ? `$${cost.toFixed(4)}`.padStart(10) : '         ?';
 
     lines.push(`  ${String(turn_n).padStart(5)}  ${modelDisplay.slice(0, 30).padEnd(30)}  ${inputDisplay}  ${outputDisplay}  ${costDisplay}`);
@@ -120,7 +136,7 @@ function renderSession(sessionId, entries, pricing, wantJson) {
     }
 
     if (wantJson) {
-      const numOrNull = (v) => (typeof v === 'number' ? v : null);
+      const numOrNull = (v) => (isTokenCount(v) ? v : null);
       jsonTurns.push({
         turn: turn_n,
         session_id: sessionId,
@@ -288,4 +304,4 @@ async function run(args) {
   }
 }
 
-module.exports = { run, compute, lookupPrice, computeCost };
+module.exports = { run, compute, lookupPrice, computeCost, fetchPricing };
