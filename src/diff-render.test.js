@@ -185,6 +185,12 @@ describe('diff-render', () => {
     assert.equal(renderRich(null), 'Added 0 / removed 0\n\n(no changes)');
   });
 
+  test('renderRich handles 200,000 added lines without RangeError (WR-03)', () => {
+    const raw = 'diff --git a/big.txt b/big.txt\nnew file mode 100644\n--- /dev/null\n+++ b/big.txt\n@@ -0,0 +1,200000 @@\n' + '+x\n'.repeat(200000);
+    const out = renderRich(raw, { color: false, width: 120 });
+    assert.equal(out.split('\n')[0], 'Added 200000 / removed 0');
+  });
+
   test('EMPTY_TREE matches the canonical git empty-tree sha', () => {
     assert.equal(EMPTY_TREE, '4b825dc642cb6eb9a060e54bf8d69288fbee4904');
   });
