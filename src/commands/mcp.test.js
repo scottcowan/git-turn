@@ -1,8 +1,9 @@
 'use strict';
 
-const { describe, test, beforeEach, afterEach } = require('node:test');
+const { describe, test, beforeEach, afterEach, mock } = require('node:test');
+const Module = require('module');
 const assert = require('node:assert/strict');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const { rmSync, readFileSync, readdirSync } = require('fs');
 const { join } = require('path');
 const { realpathSync } = require('fs');
@@ -289,19 +290,104 @@ describe('git turn mcp (MCP-01/02/03)', () => {
     assert.equal(handle.stderr().trim(), `git turn mcp: server started, scoped to ${expectedPath}`);
   });
 
-  test('no process.exit reachable after serveStdio (Pitfall 3)', () => {
+  test('process.exit only in allowed locations (Pitfall 3)', () => {
     const mcpSrc = readFileSync(join(__dirname, 'mcp.js'), 'utf8');
     const strip = src => src.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
     const stripped = strip(mcpSrc);
 
-    const lastExitIdx = stripped.lastIndexOf('process.exit');
-    const serveStdioIdx = stripped.indexOf('serveStdio(');
-    assert.ok(serveStdioIdx !== -1, 'serveStdio( must appear in mcp.js');
-    assert.ok(lastExitIdx < serveStdioIdx, 'last process.exit must precede serveStdio(');
+    assert.ok(stripped.indexOf('serveStdio(') !== -1, 'serveStdio( must appear in mcp.js');
+    assert.equal((stripped.match(/process\.exit\(/g) || []).length, 3);
+    assert.equal((stripped.match(/process\.exit\(1\)/g) || []).length, 2);
+    assert.equal((stripped.match(/process\.exit\(0\)/g) || []).length, 1);
+
+    const timeoutIdx = stripped.indexOf('setTimeout(');
+    const exit0Idx = stripped.indexOf('process.exit(0)');
+    assert.ok(timeoutIdx !== -1 && exit0Idx > timeoutIdx, 'exit(0) must be inside setTimeout');
+    const timeoutCall = stripped.slice(timeoutIdx, stripped.indexOf(';', exit0Idx));
+    assert.ok(timeoutCall.includes('SHUTDOWN_TIMEOUT_MS'));
+
+    const finIdx = stripped.indexOf('.finally(');
+    const finBody = stripped.slice(finIdx, stripped.indexOf('});', finIdx));
+    assert.equal(finBody.includes('process.exit'), false);
 
     const serverSrc = strip(readFileSync(join(__dirname, '..', 'mcp', 'server.js'), 'utf8'));
     assert.equal(serverSrc.includes('process.exit'), false);
     assert.equal(serverSrc.includes('process.on'), false);
+  });
+
+  describe('in-process startup/shutdown (D-04, D-05)', () => {
+    const mcpPath = require.resolve('./mcp');
+    let exitCalls, stderrChunks, stdoutChunks, sigint, timerState;
+
+    function loadMcpWithFakeServe(fake) {
+      const origLoad = Module._load;
+      Module._load = function (request, ...rest) {
+        if (request === '@modelcontextprotocol/server/stdio') return { serveStdio: fake };
+        return origLoad.call(this, request, ...rest);
+      };
+      try {
+        delete require.cache[mcpPath];
+        return require('./mcp');
+      } finally {
+        Module._load = origLoad;
+      }
+    }
+
+    beforeEach(() => {
+      exitCalls = []; stderrChunks = []; stdoutChunks = []; sigint = null; timerState = null;
+      require('../helpers/turn-fixtures').startSession();
+      mock.method(process, 'exit', (c) => { exitCalls.push(c); });
+      mock.method(process.stderr, 'write', (c) => { stderrChunks.push(String(c)); return true; });
+      mock.method(process.stdout, 'write', (c) => { stdoutChunks.push(String(c)); return true; });
+      mock.method(process, 'once', (ev, fn) => { if (ev === 'SIGINT') sigint = fn; return process; });
+      mock.method(global, 'setTimeout', (cb, ms) => {
+        timerState = { cb, ms, cleared: false };
+        return { unref() {}, ref() {}, _s: timerState };
+      });
+      mock.method(global, 'clearTimeout', (t) => { if (t && t._s) t._s.cleared = true; });
+    });
+
+    afterEach(() => {
+      mock.restoreAll();
+      delete require.cache[mcpPath];
+    });
+
+    test('serveStdio throw: git turn: <message>, exit 1, no startup line (D-05)', () => {
+      const { run } = loadMcpWithFakeServe(() => { throw new Error('boom'); });
+      run([]);
+      assert.deepEqual(exitCalls, [1]);
+      assert.deepEqual(stderrChunks, ['git turn: boom\n']);
+      assert.deepEqual(stdoutChunks, []);
+    });
+
+    test('hung close force-exits 0 via unref timer at 2000ms (D-04)', () => {
+      const { run } = loadMcpWithFakeServe(() => ({ close: () => new Promise(() => {}) }));
+      run([]);
+      sigint();
+      assert.equal(timerState.ms, 2000);
+      assert.deepEqual(exitCalls, []);
+      timerState.cb();
+      assert.deepEqual(exitCalls, [0]);
+    });
+
+    test('normal close clears timer and destroys stdin, no exit (D-04)', async () => {
+      const { run } = loadMcpWithFakeServe(() => ({ close: () => Promise.resolve() }));
+      const destroy = mock.method(process.stdin, 'destroy', () => {});
+      run([]);
+      sigint();
+      await new Promise(r => setImmediate(r));
+      await new Promise(r => setImmediate(r));
+      assert.equal(destroy.mock.callCount(), 1);
+      assert.equal(timerState.cleared, true);
+      assert.deepEqual(exitCalls, []);
+    });
+  });
+
+  test('help text has no "(no tools yet)" on the mcp line (D-06)', () => {
+    const r = spawnSync(process.execPath, [BIN_PATH, '--help'], { encoding: 'utf8' });
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /^\s+mcp\s+Start a stdio MCP server scoped to the current repo\s*$/m);
+    assert.equal(r.stdout.includes('no tools yet'), false);
   });
 
   test('cwd captured exactly once (MCP-02)', () => {

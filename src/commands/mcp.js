@@ -8,6 +8,8 @@ const { readSession } = require('../session');
 const { serveStdio } = require('@modelcontextprotocol/server/stdio');
 const { createServer } = require('../mcp/server');
 
+const SHUTDOWN_TIMEOUT_MS = 2000;
+
 function run(args) {
   const session = readSession();
   if (!session) {
@@ -16,17 +18,29 @@ function run(args) {
     return;
   }
 
-  // Captured ONCE, before the server starts — never re-read per tool call
-  // (MCP-02). Phase 9 tool handlers must receive this value, not re-call
-  // process.cwd().
+  // Captured ONCE, before the server starts. Tool handlers do not receive
+  // repoPath: they rely on the process cwd never changing (git subprocesses
+  // resolve the repo from it). repoPath is used only for the startup stderr
+  // line below.
   const repoPath = process.cwd();
 
-  const handle = serveStdio(createServer);
+  let handle;
+  try {
+    handle = serveStdio(createServer);
+  } catch (e) {
+    const message = e && e.message ? e.message : String(e);
+    process.stderr.write(`git turn: ${message}\n`);
+    process.exit(1);
+    return;
+  }
 
   process.stderr.write(`git turn mcp: server started, scoped to ${repoPath}\n`); // D-01
 
   process.once('SIGINT', () => {
+    const forceExit = setTimeout(() => process.exit(0), SHUTDOWN_TIMEOUT_MS);
+    forceExit.unref();
     handle.close().catch(() => {}).finally(() => {
+      clearTimeout(forceExit);
       process.stdin.destroy();
     });
   });
