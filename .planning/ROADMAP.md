@@ -155,7 +155,12 @@ Plans:
   2. An out-of-range turn number or an uninitialized-repo condition surfaces to Claude Code as a recoverable tool error, not a server crash or dropped connection.
   3. After a tool error, a subsequent unrelated tool call in the same session still succeeds.
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+**Wave 1**
+
+- [ ] 10-01-PLAN.md — Live Claude Code check: register local-scope git-turn MCP servers, call all 5 tools + out-of-range/uninitialized errors + recovery (human checkpoint), record 10-HUMAN-UAT.md, close 08-HUMAN-UAT, clean up [wave 1]
 
 ### Phase 11: Warren integration
 
