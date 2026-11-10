@@ -77,8 +77,8 @@ function computeCost(price, usage) {
 }
 
 // Renders one session's turns into plain-text lines + JSON turn entries.
-// `entries` is [{ turn_n, head }] where `head` is the commit sha whose note
-// to read. Shared by the single-session path and each --all session block.
+// `entries` is [{ turn_n, head }] where `head` is the turn's original commit
+// sha, or null when unresolved (in which case no note is read). Shared by the single-session path and each --all session block.
 function renderSession(sessionId, entries, pricing, wantJson) {
   const lines = [];
   const jsonTurns = [];
@@ -92,7 +92,9 @@ function renderSession(sessionId, entries, pricing, wantJson) {
   lines.push(`  ${'-'.repeat(5)}  ${'-'.repeat(30)}  ${'-'.repeat(8)}  ${'-'.repeat(8)}  ${'-'.repeat(10)}`);
 
   for (const { turn_n, head } of entries) {
-    const note = gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', head], { stdio: ['pipe', 'pipe', 'ignore'] });
+    const note = head
+      ? gitSafe(['notes', `--ref=${NOTES_REF}`, 'show', head], { stdio: ['pipe', 'pipe', 'ignore'] })
+      : null;
     let meta = {};
     try { meta = note ? JSON.parse(note) : {}; } catch {}
 
@@ -191,7 +193,7 @@ async function compute(args, opts = {}) {
     const groups = new Map();
     for (const t of allTurns) {
       if (!groups.has(t.session_id)) groups.set(t.session_id, []);
-      groups.get(t.session_id).push({ turn_n: t.turn_n, head: t.head_sha || t.snapshot_sha });
+      groups.get(t.session_id).push({ turn_n: t.turn_n, head: t.head_sha || null });
     }
     for (const entries of groups.values()) {
       entries.sort((a, b) => a.turn_n - b.turn_n);
@@ -252,7 +254,7 @@ async function compute(args, opts = {}) {
 
   const entries = turns.map(({ turn_n, sha }) => {
     const { headSha } = parseSnapshotMessage(sha);
-    return { turn_n, head: headSha || sha };
+    return { turn_n, head: headSha || null };
   });
 
   const { lines, jsonTurns, totalCost, turnsWithCost, turnsWithModel, modelTotals } =
