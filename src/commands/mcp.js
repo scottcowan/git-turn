@@ -36,14 +36,20 @@ function run(args) {
 
   process.stderr.write(`git turn mcp: server started, scoped to ${repoPath}\n`); // D-01
 
-  process.once('SIGINT', () => {
+  // Exit code stays 0 on force-exit (D-04, AGENTS.md contract).
+  let shuttingDown = false;
+  const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     const forceExit = setTimeout(() => process.exit(0), SHUTDOWN_TIMEOUT_MS);
     forceExit.unref();
     handle.close().catch(() => {}).finally(() => {
       clearTimeout(forceExit);
       process.stdin.destroy();
     });
-  });
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 module.exports = { run };
