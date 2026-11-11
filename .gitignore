@@ -1,3 +1,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# GSD planning artifacts (kept local)
+.planning/
