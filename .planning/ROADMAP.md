@@ -5,7 +5,7 @@
 - ✅ **v0.1 Working CLI** — Phase 1 (shipped 2026-08-09)
 - ✅ **v0.2 Read Cache + Blame/Bisect** — Phases 1-3, 03.1 (shipped 2026-09-17)
 - ✅ **v0.3 Prompt Capture** — Phases 4-6 (shipped 2026-10-01)
-- 📋 **v0.4 MCP Server** — Phases 7-10 (planned)
+- ✅ **v0.4 MCP Server** — Phases 7-10, 10.1 (shipped 2026-11-11)
 - 📋 **v1.0 Warren Integration** — Phase 11 (planned)
 
 ## Phases
@@ -47,133 +47,26 @@ Archive: `.planning/milestones/v0.3-ROADMAP.md`, requirements: `.planning/milest
 
 </details>
 
-### 📋 v0.4 MCP Server (Phases 7-10)
+<details>
+<summary>✅ v0.4 MCP Server (Phases 7-10, 10.1) — SHIPPED 2026-11-11</summary>
 
-- [x] **Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output** - Extract pure `compute()` functions from `log`/`show`/`diff`/`blame`/`cost`, make the full-line-highlight diff renderer the default (`--plain` restores today's output), and add a CLI-wide `--json` flag (completed 2026-10-12)
-- [x] **Phase 8: MCP Server Scaffold** - `git turn mcp` starts a stdio MCP server with zero tools registered; also fixes the pre-existing `cost --all` no-op (completed 2026-10-26)
-- [x] **Phase 9: Register Read-Only MCP Tools** - Wire up `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` as MCP tools (completed 2026-11-01)
-- [x] **Phase 10: End-to-End Verification with a Real MCP Client** - Claude Code exercises all 5 tools against a real session (completed 2026-11-10)
+**Goal:** Claude Code (and other MCP clients) can drive git-turn's read side over stdio, without any destructive tool surface.
+
+- [x] Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output — 5/5 plans complete (completed 2026-10-13)
+- [x] Phase 8: MCP Server Scaffold — 3/3 plans complete (completed 2026-10-26)
+- [x] Phase 9: Register Read-Only MCP Tools — 5/5 plans complete (completed 2026-11-01)
+- [x] Phase 10: End-to-End Verification with a Real MCP Client — 1/1 plan complete (completed 2026-11-10)
+- [x] Phase 10.1: Address v0.4 tech debt (INSERTED) — 4/4 plans complete (completed 2026-11-10)
+
+Archive: `.planning/milestones/v0.4-ROADMAP.md`, requirements: `.planning/milestones/v0.4-REQUIREMENTS.md`, audit: `.planning/milestones/v0.4-MILESTONE-AUDIT.md`
+
+</details>
 
 ### 📋 v1.0 Warren Integration (Phase 11)
 
 - [ ] **Phase 11: Warren integration** — `git turn branch --from N` → `POST /workspaces/{id}/branch`
 
 ## Phase Details
-
-### Phase 7: Compute/Run Split, Rich Diff Rendering & CLI JSON Output
-
-**Goal**: `log`/`show`/`diff`/`blame`/`cost` each expose a pure, in-process-callable `compute()` function; `diff`/`show` get a richer default rendering with a `--plain` escape hatch; and a `--json` output mode is available on all 5.
-**Depends on**: Phase 6
-**Requirements**: REFACTOR-01, DIFF-01, JSON-01
-**Success Criteria** (what must be TRUE):
-
-  1. Each of `log`/`show`/`diff`/`blame`/`cost` exports a `compute(args)` that returns a string (or `Promise<string>` for `cost`) and throws `Error` on failure, instead of calling `process.exit`/`console.log` directly.
-  2. Running `diff`/`show` with `--plain`, with any arguments, produces byte-identical stdout and exit codes to today's `git diff --color=always`-passthrough behavior (existing test suite passes with zero test-file edits against the `--plain` path).
-  3. Running `diff`/`show` without `--plain` (the new default) renders full-row ANSI background highlighting per added/removed line, a line-number gutter, and an "Added N / removed M" summary header, respecting `NO_COLOR`/`FORCE_COLOR` the same way today's output does.
-  4. Running any of these 5 commands with `--json` emits structured JSON instead of formatted text, usable by scripts/CI independent of MCP.
-
-**Plans**: 5 plans
-
-Plans:
-**Wave 1**
-
-- [x] 07-01-PLAN.md — TDD: pure rich unified-diff renderer `src/diff-render.js` (parseDiff/renderRich/EMPTY_TREE) [wave 1]
-- [x] 07-02-PLAN.md — log + blame: compute()/run() split and `--json` [wave 1]
-- [x] 07-03-PLAN.md — cost: async compute()/run() split and `--json` [wave 1]
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 07-04-PLAN.md — diff + show: compute()/run() split, rich default, `--plain`, `--json` [wave 2]
-
-**Wave 3** *(blocked on Wave 2 completion)*
-
-- [x] 07-05-PLAN.md — compute() purity gate + CLI e2e test, docs (help/AGENTS/README), visual checkpoint [wave 3]
-
-### Phase 8: MCP Server Scaffold
-
-**Goal**: `git turn mcp` starts a long-running stdio MCP server, correctly scoped to the invoking repo, with no tools registered yet. Also fixes a pre-existing bug: `cost --all` is parsed but never applied.
-**Depends on**: Phase 7
-**Requirements**: MCP-01, MCP-02, MCP-03, COST-01
-**Success Criteria** (what must be TRUE):
-
-  1. Running `git turn mcp` inside a git-turn-initialized repo starts a stdio server that completes the `initialize`/`notifications/initialized` handshake with a real MCP client.
-  2. Running `git turn mcp` inside a repo that has never run `git turn init` fails loudly on stderr and exits, without leaving a server process running.
-  3. The server stays alive while its stdio stream is open and exits cleanly when stdin closes or on SIGINT, without being killed by any `process.exit` call reachable from its code path.
-  4. The server captures cwd once at startup and never re-resolves the repo per tool call.
-  5. `git turn cost --all` reports token usage/cost across every session in the repo (not just the current one), using the same `listAllTurns({ noCache })` cross-session helper `blame`/`bisect`/`heatmap` already use.
-
-**Plans**: 3 plans
-
-Plans:
-**Wave 1**
-
-- [x] 08-01-PLAN.md — COST-01: wire `cost --all` to `listAllTurns({ noCache })`, per-session blocks + grand total (D-04) [wave 1]
-- [x] 08-02-PLAN.md — Human-gated install of `@modelcontextprotocol/server@2.3.1` + `zod@4.6.5` (exact pins, lockfile) [wave 1, checkpoint]
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 08-03-PLAN.md — `git turn mcp`: `src/mcp/server.js` factory + `src/commands/mcp.js` serveStdio bootstrap, bin wiring, subprocess tests, AGENTS.md (MCP-01/02/03, D-01/02/03) [wave 2]
-
-### Phase 9: Register Read-Only MCP Tools
-
-**Goal**: An MCP client sees and can successfully call all 5 read-only git-turn tools, with output matching the CLI and errors surfaced safely.
-**Depends on**: Phase 7, Phase 8
-**Requirements**: MCP-04, MCP-05, MCP-06, MCP-07, MCP-08, MCP-09, MCP-10, VERIFY-03
-**Success Criteria** (what must be TRUE):
-
-  1. An MCP client calling `tools/list` sees `git_turn_log`, `git_turn_show`, `git_turn_diff`, `git_turn_blame`, and `git_turn_cost`.
-  2. Calling each tool against a real session returns the same text content the equivalent CLI command prints today, including the `tool_summary` field in `git_turn_show` when present on the turn's note.
-  3. Calling a tool with a bad argument (e.g. an out-of-range turn number, or against an uninitialized repo) returns an `isError: true` result carrying the CLI's own message text, without throwing or crashing the server.
-  4. `git_turn_show`/`git_turn_diff` output is always colorless, regardless of the server process's TTY state.
-  5. A live round-trip test — a real hook-written note read back through each tool, not a hand-built fixture — proves correct note/sha resolution, closing out the snapshot-sha-vs-HEAD-sha bug class that has shipped and been fixed twice before (v0.2, v0.3).
-
-**Plans**: 5 plans
-
-Plans:
-**Wave 1**
-
-- [x] 09-01-PLAN.md — `show.js` plain-text `Tool summary:` line + `opts.color` override on `show.js`/`diff.js` compute() (MCP-05/MCP-10, D-02) [wave 1]
-- [x] 09-02-PLAN.md — `git_turn_log`/`_blame`/`_cost` tool adapters + per-tool tests (MCP-04/07/08/09, D-01/03/04) [wave 1]
-
-**Wave 2** *(blocked on 09-01)*
-
-- [x] 09-03-PLAN.md — `git_turn_show`/`_diff` tool adapters with unconditional `{ color: false }` + tests (MCP-05/06/09/10) [wave 2]
-
-**Wave 3** *(blocked on 09-02, 09-03)*
-
-- [x] 09-04-PLAN.md — Register all 5 tools in `createServer()`, stdio `tools/list`/`tools/call` protocol tests, AGENTS.md (criteria 1/3/4) [wave 3]
-- [x] 09-05-PLAN.md — VERIFY-03 live round-trip: real installed hook + real `record-prompt` read back through all 5 handlers [wave 3]
-
-### Phase 10: End-to-End Verification with a Real MCP Client
-
-**Goal**: A real MCP client (Claude Code) can drive git-turn's full read-only tool surface against real data, including graceful recovery from tool errors.
-**Depends on**: Phase 9
-**Requirements**: VERIFY-04
-**Success Criteria** (what must be TRUE):
-
-  1. Claude Code, connected to `git turn mcp` as a real MCP client, successfully calls all 5 tools against a real session with real turns.
-  2. An out-of-range turn number or an uninitialized-repo condition surfaces to Claude Code as a recoverable tool error, not a server crash or dropped connection.
-  3. After a tool error, a subsequent unrelated tool call in the same session still succeeds.
-
-**Plans**: 1 plan
-
-Plans:
-**Wave 1**
-
-- [x] 10-01-PLAN.md — Live Claude Code check: register local-scope git-turn MCP servers, call all 5 tools + out-of-range/uninitialized errors + recovery (human checkpoint), record 10-HUMAN-UAT.md, close 08-HUMAN-UAT, clean up [wave 1]
-
-### Phase 10.1: Address v0.4 tech debt: mcp.js hardening, head_sha fallback, stale help text (INSERTED)
-
-**Goal:** Clear the v0.4 milestone-audit tech debt before archiving: `git turn mcp` reports startup failures as `git turn: <message>` and always exits 0 on SIGINT within ~2s, `git turn cost` never reads a note keyed by a snapshot sha, malformed usage cannot poison cost totals, and stale help/comments/bookkeeping match reality. No new capabilities.
-**Requirements**: none (tech debt; decisions D-01..D-10 in 10.1-CONTEXT.md)
-**Depends on:** Phase 10
-**Plans:** 4/4 plans complete
-
-Plans:
-- [x] 10.1-01-PLAN.md — mcp.js try/catch around serveStdio, bounded SIGINT shutdown, stale comment + `--help` text, rewrite Pitfall-3 static test (D-04..D-07) [wave 1]
-- [x] 10.1-02-PLAN.md — cost.js unresolved head never falls back to snapshot sha at both sites; finite usage guard, /i prefix strip, HTTP status check (D-01..D-03, D-09) [wave 1]
-- [x] 10.1-03-PLAN.md — renderRich spread-free gutter, colon-filename blame characterization, tool_summary delimiter guard (D-09, D-10) [wave 1]
-- [x] 10.1-04-PLAN.md — MCP adapter direct-call arg guards; 08-VERIFICATION/09-01-SUMMARY bookkeeping; close stale cost --all todo (D-08, D-10) [wave 1]
 
 ### Phase 11: Warren integration
 
@@ -201,6 +94,7 @@ Plans:
 | 8. MCP server scaffold | v0.4 | 3/3 | Complete   | 2026-10-26 |
 | 9. Register read-only MCP tools | v0.4 | 5/5 | Complete   | 2026-11-01 |
 | 10. End-to-end verification with a real MCP client | v0.4 | 1/1 | Complete   | 2026-11-10 |
+| 10.1. Address v0.4 tech debt | v0.4 | 4/4 | Complete   | 2026-11-10 |
 | 11. Warren integration | v1.0 | 0/? | Planned | — |
 
 Also shipped ad hoc, untracked by any phase (same pattern as Phase 2's SQLite cache): `session new`/`session list` (fork lineage) and `export` (cross-repo ref bundle) — commit `7b446ce`, 2026-09-06.

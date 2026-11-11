@@ -2,33 +2,33 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: MCP Server
-status: ready_to_plan
-stopped_at: Phase 10.1 complete (4/4) — ready to discuss Phase 11
-last_updated: 2026-11-10T21:58:49.205Z
-last_activity: 2026-11-10 -- Phase 10.1 execution started
+status: Awaiting next milestone
+stopped_at: v0.4 milestone completed and archived
+last_updated: "2026-11-11T19:54:57.266Z"
+last_activity: 2026-11-11 — Milestone v0.4 completed and archived
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
-  completed_plans: 32
-  percent: 67
+  completed_plans: 18
+  percent: 83
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-07)
+See: .planning/PROJECT.md (updated 2026-11-11)
 
 **Core value:** Know exactly which agent turn broke your code — diff, blame, bisect, and revert at turn granularity.
-**Current focus:** Phase 11 — warren integration
+**Current focus:** Planning next milestone (v1.0 Warren integration is blocked on the Warren API)
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-10
+Phase: Milestone v0.4 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-11-11 — Milestone v0.4 completed and archived
 
 ## Performance Metrics
 
@@ -95,21 +95,22 @@ Last activity: 2026-11-10
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | uat | 03-UAT.md (Phase 03) | resolved, 0 pending scenarios | v0.2 close |
-| feature | MCP server | in progress, v0.4 Phases 7-10 | v0.3 roadmap creation, 2026-09-17 |
 | feature | Warren integration | planned, moved to v1.0 (Phase 11) | v0.4 roadmap creation, 2026-10-07 |
 | feature | `git_turn_revert`/`bisect`/`redact`/`record-prompt` as MCP tools | deferred, blocked on MCP confirmation/elicitation pattern | v0.4 requirements definition, 2026-10-07 |
-| todo | 2026-09-07-rich-diff-renderer.md [cli] | acknowledged, deferred | v0.3 close, 2026-10-01 |
 | todo | 2026-09-17-mindwalk-integration.md [integration] | acknowledged, deferred | v0.3 close, 2026-10-01 |
+| todo | 2026-10-07-explore-stable-change-identity-beyond-sha-anchoring.md [research] | acknowledged, deferred | v0.4 close, 2026-11-11 |
+| todo | 2026-10-16-claude-code-stop-hook-for-auto-record-prompt-capture.md [integration] | acknowledged, deferred | v0.4 close, 2026-11-11 |
+| todo | 2026-11-01-git-turn-install-global-hook-via-init-templatedir.md [cli] | acknowledged, deferred | v0.4 close, 2026-11-11 |
 
 ## Session Continuity
 
 Last session: 2026-11-10T20:49:02.029Z
-Stopped at: Phase 10.1 context gathered
+Stopped at: v0.4 milestone completed and archived
 Resume file: .planning/phases/10.1-address-v0-4-tech-debt-mcp-js-hardening-head-sha-fallback-st/10.1-CONTEXT.md
 
 ## Operator Next Steps
 
-- Review and approve the v0.4 roadmap, then run `/gsd-plan-phase 7`
+- Start the next milestone with /gsd-new-milestone
 
 ## Accumulated Context
 

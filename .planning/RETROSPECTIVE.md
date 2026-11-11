@@ -139,15 +139,61 @@
 - Phase 5 ran in two waves (git.js/cache.js prerequisites, then the command); Phase 6 ran in two waves (show/log/cost fixes + redact, then the purge procedure) — wave-gating caught the shared sha-resolution bug once instead of three times
 - Test suite grew from 145 (v0.2 close) to 217 (72 new tests) across the milestone
 
+## Milestone: v0.4 — MCP Server
+
+**Shipped:** 2026-11-11
+**Phases:** 5 (7, 8, 9, 10, 10.1) | **Plans:** 18
+
+### What Was Built
+
+- Pure `compute()` + thin `run()` split for `log`/`show`/`diff`/`blame`/`cost`, with a `--json` mode and a rich default diff renderer (`--plain` keeps old output byte-identical)
+- `git turn mcp`: stdio MCP server with five read-only tools as thin adapters over `compute()`, always colorless, errors returned as recoverable `isError` results
+- `cost --all` fixed (it had been a silent no-op)
+- A live check with a real Claude Code client (9/9) against this repo's own history, then Phase 10.1 hardening: startup errors as `git turn: <msg>`, bounded SIGINT/SIGTERM shutdown, `cost` no longer reading notes keyed by a snapshot sha
+
+### What Worked
+
+- Doing the compute/run refactor first (Phase 7) made the MCP adapters trivial; Phase 9's tools are small because the logic already existed behind a pure function
+- Running the milestone audit before closing, then spending one inserted phase (10.1) on its debt list, ended the milestone with no open warnings instead of carrying them forward
+- Round-trip tests that use real hook-written and `record-prompt`-written notes (Phase 9) rather than hand-built fixtures, applying the v0.3 lesson
+
+### What Was Inefficient
+
+- The HEAD-vs-snapshot-sha note-lookup bug class appeared for a third time (v0.2, v0.3, now `cost.js`'s fallback); it was only removed structurally in Phase 10.1, with regression tests that plant a note on the snapshot sha
+- Phase 10.1 planned a Phase 7 "colon in filename" blame bug that did not exist (git splits `sha:path` at the first colon); it ended as a characterization test only
+- Parallel worktree executors had no `node_modules` (gitignored), and two of them could not finish a full `npm test` inside the tool timeout, so the first full-suite result came only after merging
+- The code-review fixer's first SIGTERM change used `process.on` and broke two tests that stub `process.once`; it was caught by the suite, not by the fix itself
+
+### Patterns Established
+
+- MCP tools are adapters over `compute()`; never a second implementation of a command
+- Tests for process-level behavior (SIGINT timer, startup throw) run in-process by faking `serveStdio` and stubbing `process.exit`/`process.once`, in `mcp.test.js`, which runs as its own second pass of `npm test`
+- Regression tests for lookup-key bugs plant the wrong-key data and assert it is never read
+
+### Key Lessons
+
+- When a bug class has shipped twice, fix it structurally (no fallback key at all) and write the regression test against the wrong key, not just the right one
+- Verify a suspected bug with a one-line experiment before planning a fix for it
+- Give parallel worktree executors a way to run the full suite (symlinked dependencies, or a longer timeout), or plan on one post-merge full run
+
+### Cost Observations
+
+- Full GSD workflow for all five phases; Phase 10 shipped no source code by design (a manual live check)
+- Phase 10.1 ran four plans in one parallel wave on disjoint files; no merge conflicts
+- Test suite grew from 217 (v0.3 close) to 369 (357 main + 12 `mcp.test.js`)
+- Model mix and session counts were not recorded for this milestone
+
 ## Cross-Milestone Trends
 
-| Metric | v0.1 | v0.2 | v0.3 |
-|---|---|---|---|
-| Phases (governed) | 1 | 2 (Phase 3, 03.1) | 3 (Phase 4, 5, 6) |
-| Phases (ad hoc) | 0 | 2 (Phase 2, session/export) | 0 |
-| Plans | 6 | 8 governed | 8 governed |
-| Test suite size | 23 | 145 | 217 |
-| Milestone audit run | No | Yes — found 1 real bug | Yes — found 1 real bug (sha resolution) + 2 tech-debt items |
-| STATE.md manual corrections needed | 0 | 5+ | 0 |
+| Metric | v0.1 | v0.2 | v0.3 | v0.4 |
+|---|---|---|---|---|
+| Phases (governed) | 1 | 2 (Phase 3, 03.1) | 3 (Phase 4, 5, 6) | 5 (Phase 7-10, 10.1) |
+| Phases (ad hoc) | 0 | 2 (Phase 2, session/export) | 0 | 0 |
+| Plans | 6 | 8 governed | 8 governed | 18 governed |
+| Test suite size | 23 | 145 | 217 | 369 |
+| Milestone audit run | No | Yes — found 1 real bug | Yes — found 1 real bug (sha resolution) + 2 tech-debt items | Yes — no bugs, tech debt only; cleared in Phase 10.1 |
+| STATE.md manual corrections needed | 0 | 5+ | 0 | 0 |
 
 **Trend:** Ad hoc shipping (skip full phase machinery for small, well-understood work) was a recurring pattern through v0.2 but dropped to zero in v0.3 — all three phases went through the full discuss→plan→execute→verify workflow. Milestone audits continue to pay for themselves: both v0.2 and v0.3 audits caught real bugs that phase-local unit tests missed, reinforcing that live E2E checks against real written data are not optional for note-write/note-read features.
+
+**v0.4:** The audit found debt rather than defects, and an inserted cleanup phase before archiving removed it. The one repeat offender is still the note-lookup sha bug class (third occurrence).

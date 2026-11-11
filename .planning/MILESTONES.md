@@ -1,5 +1,24 @@
 # Milestones
 
+## v0.4 MCP Server (Shipped: 2026-11-11)
+
+**Phases completed:** 5 phases (7, 8, 9, 10, 10.1), 18 plans, 25 tasks
+**Delivered:** Claude Code (or any MCP client) can drive git-turn's read side over stdio via `git turn mcp`, with five read-only tools and no destructive surface.
+
+**Key accomplishments:**
+
+- Every read command (`log`/`show`/`diff`/`blame`/`cost`) now has a pure, in-process `compute()` alongside its CLI `run()`, verified by an out-of-process purity probe.
+- `diff`/`show` default to a rich renderer (full-row highlight, line-number gutter, "Added N / removed M" summary); `--plain` keeps the old output byte-identical.
+- A CLI-wide `--json` flag on all five read commands, with a uniform `{"error": "..."}` + exit 1 failure contract.
+- `git turn cost --all` fixed: it reports real per-session blocks and a grand total instead of silently ignoring the flag.
+- `git turn mcp` serves `git_turn_log`, `_show`, `_diff`, `_blame`, `_cost` over stdio (`@modelcontextprotocol/server` + `zod`, git-turn's first runtime dependencies). Tool errors come back as recoverable `isError` results, and output is always colorless.
+- Verified end to end with a real Claude Code client against this repo's 43-turn history (9/9 checks), then hardened in Phase 10.1: startup errors reported as `git turn: <msg>`, bounded SIGINT/SIGTERM shutdown, and `cost` no longer reads notes keyed by a snapshot sha.
+
+**Stats:** 369 tests (357 main + 12 `mcp.test.js`). Audit: `tech_debt`, no blockers; the debt was cleared in Phase 10.1.
+**Known deferred items at close:** 4 (see STATE.md Deferred Items)
+
+---
+
 ## v0.3 Prompt Capture (Shipped: 2026-10-01)
 
 **Phases completed:** 3 phases, 8 plans, 16 tasks
