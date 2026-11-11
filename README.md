@@ -13,8 +13,13 @@ Turns group commits by session automatically. You don't tag anything or change h
 ## Install
 
 ```sh
-npm install -g git-turn
+git clone https://github.com/scottcowan/git-turn.git
+cd git-turn
+npm install
+npm link
 ```
+
+`npm link` puts `git-turn` on your `PATH`, so `git turn <command>` works. (git-turn is not published to the npm registry yet.)
 
 Then run this once in each repo you want to track:
 
@@ -177,6 +182,22 @@ throwaway repos) and each contradicts what you might otherwise assume:
 `git filter-repo` and BFG Repo-Cleaner are **not** alternatives here — neither tool has
 documented handling of the `refs/notes/*` ref namespace.
 
+## MCP server
+
+`git turn mcp` starts a stdio [MCP](https://modelcontextprotocol.io) server so an MCP client can read your turn history. It is scoped to the repo it is started in and exposes five **read-only** tools:
+
+`git_turn_log`, `git_turn_show`, `git_turn_diff`, `git_turn_blame`, `git_turn_cost`
+
+Each returns the same text its CLI command prints (always without color). Failures such as an out-of-range turn come back as tool errors, not crashes. Destructive and write commands (`revert`, `bisect`, `redact`, `record-prompt`) are deliberately not exposed.
+
+Run `git turn init` in the repo first, then register it with Claude Code from inside that repo:
+
+```sh
+claude mcp add git-turn -- git turn mcp
+```
+
+The MCP server needs the npm dependencies installed (`npm install` in the git-turn checkout); every other command has no runtime dependencies.
+
 ## Storage
 
 Everything lives in your git repo. No server, no external service.
@@ -193,4 +214,4 @@ Node.js 22+. Git 2.x.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

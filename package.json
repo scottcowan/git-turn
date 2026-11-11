@@ -1,6 +1,6 @@
 {
   "name": "git-turn",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "git extension for auditing AI agent sessions",
   "bin": {
     "git-turn": "./bin/git-turn"
@@ -24,5 +24,13 @@
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",
     "zod": "4.6.5"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcowan/git-turn.git"
+  },
+  "bugs": {
+    "url": "https://github.com/scottcowan/git-turn/issues"
+  },
+  "homepage": "https://github.com/scottcowan/git-turn#readme"
 }
